@@ -223,11 +223,6 @@ jobs:
         working-directory: src
         run: scripts/build.ps1 -Config Release -Platform linux -Arch ${{ matrix.arch }} -Tls quictls -DisableTools -DisableTest -DisablePerf ${{ matrix.onebranch }}
 
-      - name: Rename artifacts to avoid conflict with regular Linux builds
-        shell: pwsh
-        run: |
-          Rename-Item src/artifacts/bin/linux src/artifacts/bin/linux-steamrt
-
       - name: Upload raw artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -284,8 +279,7 @@ jobs:
             New-Item "$p/build/native/include" -Type Dir -Force | Out-Null
 
             foreach ($plat in $Platforms) {
-              $root = if ($plat.ContainsKey('root')) { $plat.root } else { $ArtifactsDir }
-              $srcBin = "$root/bin/$($plat.os)/$($plat.a)_Release_$($plat.tls)"
+              $srcBin = "$ArtifactsDir/bin/$($plat.os)/$($plat.a)_Release_$($plat.tls)"
               if ($plat.os -eq 'windows') {
                 Copy-Item "$srcBin/msquic.dll","$srcBin/msquic.pdb","$srcBin/msquic.lib" "$p/runtimes/$($plat.rid)/native/"
               } elseif ($plat.os -eq 'macos') {
@@ -377,16 +371,16 @@ jobs:
             @{rid="android-arm64";  os="android"; a="arm64"; tls="quictls"}
           )
 
-          # Quictls.SteamRT: all platforms with SteamRT Linux
+          # Quictls.SteamRT: same platforms as Quictls but Linux compiled with SteamRT SDK
           Write-Host "=== Packaging MsQuicBuilds.Native.Quictls.SteamRT ==="
           New-MsQuicPkg -Tls quictls -Title "Quictls.SteamRT" -Platforms @(
-            @{rid="win-x64";        os="windows";        a="x64";   tls="quictls"},
-            @{rid="win-arm64";      os="windows";        a="arm64"; tls="quictls"},
-            @{rid="linux-x64";      os="linux-steamrt";   a="x64";   tls="quictls"},
-            @{rid="linux-arm64";    os="linux-steamrt";   a="arm64"; tls="quictls"},
-            @{rid="osx-x64";        os="macos";          a="x64";   tls="quictls"},
-            @{rid="osx-arm64";      os="macos";          a="arm64"; tls="quictls"},
-            @{rid="android-arm64";  os="android";        a="arm64"; tls="quictls"}
+            @{rid="win-x64";        os="windows"; a="x64";   tls="quictls"},
+            @{rid="win-arm64";      os="windows"; a="arm64"; tls="quictls"},
+            @{rid="linux-x64";      os="linux";   a="x64";   tls="quictls"},
+            @{rid="linux-arm64";    os="linux";   a="arm64"; tls="quictls"},
+            @{rid="osx-x64";        os="macos";   a="x64";   tls="quictls"},
+            @{rid="osx-arm64";      os="macos";   a="arm64"; tls="quictls"},
+            @{rid="android-arm64";  os="android"; a="arm64"; tls="quictls"}
           )
 
           Write-Host "=== All NuGet packages ==="
