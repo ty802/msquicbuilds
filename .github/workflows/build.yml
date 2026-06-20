@@ -35,6 +35,12 @@ jobs:
             arch: arm64
             tls: schannel
 
+          - name: windows-amd64-quictls
+            os: windows-2022
+            platform: windows
+            arch: x64
+            tls: quictls
+
           - name: linux-amd64
             os: ubuntu-22.04
             platform: linux
@@ -86,6 +92,10 @@ jobs:
         if: matrix.platform == 'android'
         run: sudo apt-get update -qq && sudo apt-get install -y -qq cmake build-essential
 
+      - name: Install NASM (Windows quictls)
+        if: runner.os == 'Windows' && matrix.tls != 'schannel'
+        uses: ilammy/setup-nasm@v1
+
       - name: Build
         shell: pwsh
         working-directory: src
@@ -129,7 +139,7 @@ jobs:
           path: src/artifacts/
 
   #############################################################################
-  # NUGET PACKAGING (Windows only – combines x64 + arm64 into .nupkg)
+  # NUGET PACKAGING (Windows – produces .nupkg per TLS provider)
   #############################################################################
   nuget-windows:
     needs: [build]
@@ -141,16 +151,22 @@ jobs:
           repository: microsoft/msquic
           path: src
 
-      - name: Download Windows amd64 artifacts
+      - name: Download Windows amd64 (schannel) artifacts
         uses: actions/download-artifact@v4
         with:
           name: windows-amd64
           path: src/artifacts
 
-      - name: Download Windows arm64 artifacts
+      - name: Download Windows arm64 (schannel) artifacts
         uses: actions/download-artifact@v4
         with:
           name: windows-arm64
+          path: src/artifacts
+
+      - name: Download Windows amd64 (quictls) artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-amd64-quictls
           path: src/artifacts
 
       - name: Package NuGet
@@ -158,56 +174,59 @@ jobs:
         working-directory: src
         run: |
           $ErrorActionPreference = 'Stop'
-          $Tls = "schannel"
           $Config = "Release"
           $Root = Resolve-Path "."
           $ArtifactsDir = "$Root/artifacts"
           $PlatformDir = "$ArtifactsDir/bin/windows"
-          $PackagingDir = "$ArtifactsDir/temp/nuget"
           $DistDir = "$ArtifactsDir/dist"
-
-          # Architectures we built (no x86 – user requested amd64 + arm64 only)
-          $Archs = @("x64", "arm64")
-
-          # Clean & create layout
-          Remove-Item $PackagingDir -Recurse -Force -ErrorAction Ignore
-          foreach ($Arch in $Archs) {
-            New-Item -Path "$PackagingDir/build/native/lib/$Arch" -ItemType Directory -Force | Out-Null
-            New-Item -Path "$PackagingDir/build/native/bin/$Arch" -ItemType Directory -Force | Out-Null
-          }
-          New-Item -Path "$PackagingDir/build/native/include" -ItemType Directory -Force | Out-Null
-          New-Item -Path $DistDir -ItemType Directory -Force | Out-Null
-
-          # Copy binaries per architecture
-          foreach ($Arch in $Archs) {
-            $BuildPath = "$PlatformDir/${Arch}_${Config}_${Tls}"
-            Write-Host "Copying from $BuildPath"
-            Copy-Item "$BuildPath/msquic.dll"    "$PackagingDir/build/native/bin/$Arch/"
-            Copy-Item "$BuildPath/msquic.pdb"    "$PackagingDir/build/native/bin/$Arch/"
-            Copy-Item "$BuildPath/msquic.lib"    "$PackagingDir/build/native/lib/$Arch/"
-          }
-
-          # Copy public headers
-          foreach ($h in @("msquic.h", "msquicp.h", "msquic.hpp", "msquic_winuser.h")) {
-            Copy-Item "$Root/src/inc/$h" "$PackagingDir/build/native/include/"
-          }
-
-          # Copy package metadata
-          Copy-Item "$Root/LICENSE" $PackagingDir
-          Copy-Item "$Root/src/distribution/pkgicon.png" $PackagingDir
-
-          # Build a .nuspec that only lists x64 + arm64 (no x86)
           $CommitHash = & git -C $Root rev-parse HEAD
           $RepoRemote = "https://github.com/microsoft/msquic.git"
           $Version = "2.6.0-ci.$env:GITHUB_RUN_NUMBER"
 
-          @"
+          $CommonHeaders = @("msquic.h", "msquicp.h", "msquic.hpp", "msquic_winuser.h")
+
+          function New-NuGetPackage {
+            param($Tls, $Archs)
+
+            $PackagingDir = "$ArtifactsDir/temp/nuget/$Tls"
+            Remove-Item $PackagingDir -Recurse -Force -ErrorAction Ignore
+
+            foreach ($Arch in $Archs) {
+              New-Item -Path "$PackagingDir/build/native/lib/$Arch" -ItemType Directory -Force | Out-Null
+              New-Item -Path "$PackagingDir/build/native/bin/$Arch" -ItemType Directory -Force | Out-Null
+            }
+            New-Item -Path "$PackagingDir/build/native/include" -ItemType Directory -Force | Out-Null
+            New-Item -Path $DistDir -ItemType Directory -Force | Out-Null
+
+            # Binaries per arch
+            foreach ($Arch in $Archs) {
+              $BuildPath = "$PlatformDir/${Arch}_${Config}_${Tls}"
+              Write-Host "[$Tls] Copying from $BuildPath"
+              Copy-Item "$BuildPath/msquic.dll" "$PackagingDir/build/native/bin/$Arch/"
+              Copy-Item "$BuildPath/msquic.pdb" "$PackagingDir/build/native/bin/$Arch/"
+              Copy-Item "$BuildPath/msquic.lib" "$PackagingDir/build/native/lib/$Arch/"
+            }
+
+            # Headers
+            foreach ($h in $CommonHeaders) {
+              Copy-Item "$Root/src/inc/$h" "$PackagingDir/build/native/include/"
+            }
+
+            # Metadata
+            Copy-Item "$Root/LICENSE" $PackagingDir
+            Copy-Item "$Root/src/distribution/pkgicon.png" $PackagingDir
+
+            # Caps-normalize for file names (schannel → Schannel)
+            $TlsLabel = "$($Tls.Substring(0,1).ToUpper())$($Tls.Substring(1))"
+            $ArchDesc = ($Archs -join ', ')
+
+            @"
           <?xml version="1.0"?>
           <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
             <metadata>
-              <id>Microsoft.Native.Quic.MsQuic.Schannel</id>
+              <id>Microsoft.Native.Quic.MsQuic.$TlsLabel</id>
               <version>$Version</version>
-              <title>MsQuic (Schannel)</title>
+              <title>MsQuic ($TlsLabel)</title>
               <authors>Microsoft</authors>
               <license type="expression">MIT</license>
               <icon>pkgicon.png</icon>
@@ -215,44 +234,51 @@ jobs:
               <projectUrl>https://github.com/microsoft/msquic</projectUrl>
               <requireLicenseAcceptance>true</requireLicenseAcceptance>
               <copyright>© Microsoft Corporation. All rights reserved.</copyright>
-              <description>MsQuic native library for x64 and arm64 using schannel for TLS</description>
+              <description>MsQuic native library for $ArchDesc using $Tls for TLS</description>
               <repository type="git" url="$RepoRemote" commit="$CommitHash" />
-              <tags>native quic msquic schannel</tags>
+              <tags>native quic msquic $Tls</tags>
             </metadata>
           </package>
-          "@ | Set-Content "$PackagingDir/Microsoft.Native.Quic.MsQuic.Schannel.nuspec" -Encoding UTF8
+          "@ | Set-Content "$PackagingDir/Microsoft.Native.Quic.MsQuic.$TlsLabel.nuspec" -Encoding UTF8
 
-          # Build a .targets that only maps x64 and arm64 (no win32/x86)
-          @"
-          <?xml version="1.0" encoding="utf-8"?>
-          <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-            <ItemDefinitionGroup>
-              <ClCompile>
-                <AdditionalIncludeDirectories>`$(MSBuildThisFileDirectory)include/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-              </ClCompile>
-              <Link Condition="'`$(Platform.ToLower())' == 'x64'">
-                <AdditionalDependencies>`$(MSBuildThisFileDirectory)lib/x64/msquic.lib;%(AdditionalDependencies)</AdditionalDependencies>
-              </Link>
-              <Link Condition="'`$(Platform.ToLower())' == 'arm64'">
-                <AdditionalDependencies>`$(MSBuildThisFileDirectory)lib/arm64/msquic.lib;%(AdditionalDependencies)</AdditionalDependencies>
-              </Link>
-            </ItemDefinitionGroup>
-            <Target Name="msquic_AfterBuild" AfterTargets="AfterBuild" />
-            <Target Name="msquic_AfterBuild_x64" Label="x64" Condition="'`$(Platform.ToLower())' == 'x64'" AfterTargets="msquic_AfterBuild">
-              <Copy SourceFiles="`$(MSBuildThisFileDirectory)bin/x64/msquic.dll" DestinationFolder="`$(TargetDir)" SkipUnchangedFiles="true" />
-            </Target>
-            <Target Name="msquic_AfterBuild_arm64" Label="arm64" Condition="'`$(Platform.ToLower())' == 'arm64'" AfterTargets="msquic_AfterBuild">
-              <Copy SourceFiles="`$(MSBuildThisFileDirectory)bin/arm64/msquic.dll" DestinationFolder="`$(TargetDir)" SkipUnchangedFiles="true" />
-            </Target>
-          </Project>
-          "@ | Set-Content "$PackagingDir/build/native/Microsoft.Native.Quic.MsQuic.Schannel.targets" -Encoding UTF8
+            # Build .targets
+            $targetLines = @(
+              '<?xml version="1.0" encoding="utf-8"?>',
+              '<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">',
+              '  <ItemDefinitionGroup>',
+              '    <ClCompile>',
+              '      <AdditionalIncludeDirectories>`$(MSBuildThisFileDirectory)include/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>',
+              '    </ClCompile>'
+            )
+            foreach ($Arch in $Archs) {
+              $targetLines += "    <Link Condition=""'`$(Platform.ToLower())' == '$Arch'"">"
+              $targetLines += "      <AdditionalDependencies>`$(MSBuildThisFileDirectory)lib/$Arch/msquic.lib;%(AdditionalDependencies)</AdditionalDependencies>"
+              $targetLines += "    </Link>"
+            }
+            $targetLines += '  </ItemDefinitionGroup>'
+            $targetLines += '  <Target Name="msquic_AfterBuild" AfterTargets="AfterBuild" />'
+            foreach ($Arch in $Archs) {
+              $targetLines += "  <Target Name=""msquic_AfterBuild_$Arch"" Label=""$Arch"" Condition=""'`$(Platform.ToLower())' == '$Arch'"" AfterTargets=""msquic_AfterBuild"">"
+              $targetLines += "    <Copy SourceFiles=""`$(MSBuildThisFileDirectory)bin/$Arch/msquic.dll"" DestinationFolder=""`$(TargetDir)"" SkipUnchangedFiles=""true"" />"
+              $targetLines += "  </Target>"
+            }
+            $targetLines += '</Project>'
 
-          # Pack
-          nuget pack "$PackagingDir/Microsoft.Native.Quic.MsQuic.Schannel.nuspec" `
-            -OutputDirectory $DistDir `
-            -p CommitHash=$CommitHash `
-            -p RepoRemote=$RepoRemote `
-            -Version $Version
+            $targetLines -join "`n" | Set-Content "$PackagingDir/build/native/Microsoft.Native.Quic.MsQuic.$TlsLabel.targets" -Encoding UTF8
+
+            # Pack
+            nuget pack "$PackagingDir/Microsoft.Native.Quic.MsQuic.$TlsLabel.nuspec" `
+              -OutputDirectory $DistDir `
+              -p CommitHash=$CommitHash `
+              -p RepoRemote=$RepoRemote `
+              -Version $Version
+          }
+
+          # Schannel: x64 + arm64
+          New-NuGetPackage -Tls schannel -Archs @("x64", "arm64")
+
+          # QuicTLS: x64 only (quictls/openssl don't support Windows arm64)
+          New-NuGetPackage -Tls quictls -Archs @("x64")
 
           Write-Host "=== NuGet packages ==="
           Get-ChildItem $DistDir
@@ -260,7 +286,7 @@ jobs:
       - name: Upload NuGet packages
         uses: actions/upload-artifact@v4
         with:
-          name: nuget-windows-schannel
+          name: nuget-windows
           path: src/artifacts/dist/*.nupkg
 
   #############################################################################
