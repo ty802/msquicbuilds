@@ -15,6 +15,8 @@ NuGet packages produced:
 - `Microsoft.Native.Quic.MsQuic.QuicTls` – Windows x64 (older Windows)
 - `Microsoft.Native.Quic.MsQuic.Linux` – Linux x64 + arm64
 - `Microsoft.Native.Quic.MsQuic.macOS` – macOS x64 + arm64
+- `Microsoft.Native.Quic.MsQuic.AllPlatforms.Schannel` – meta package, depends on all OS packages (Schannel TLS)
+- `Microsoft.Native.Quic.MsQuic.AllPlatforms.QuicTls` – meta package, depends on all OS packages (QuicTls TLS)
 
 ## Artifacts
 

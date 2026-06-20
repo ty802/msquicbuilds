@@ -534,11 +534,95 @@ jobs:
           }
 
   #############################################################################
+  # META PACKAGES – aggregate all OS platform packages into one ref
+  #  - Schannel flavor (Windows Schannel + Linux + macOS)
+  #  - QuicTls flavor   (Windows QuicTls + Linux + macOS)
+  #############################################################################
+  nuget-meta:
+    needs: [nuget-windows, nuget-linux, nuget-macos]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout msquic (to grab version metadata)
+        uses: actions/checkout@v4
+        with:
+          repository: microsoft/msquic
+          path: src
+
+      - name: Install NuGet CLI
+        shell: pwsh
+        run: dotnet tool install --global NuGet.CommandLine --version 6.*
+
+      - name: Create & publish meta NuGet packages
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $CommitHash = & git -C src rev-parse HEAD
+          $RepoRemote = "https://github.com/microsoft/msquic.git"
+          $Version = "2.6.0-ci.$env:GITHUB_RUN_NUMBER"
+          $DistDir = "dist"
+          New-Item $DistDir -ItemType Directory -Force | Out-Null
+
+          function New-MetaPackage([string]$Id, [string]$WinDep, [string]$TitleSuffix) {
+            $pkgDir = "tmp/meta/$Id"
+            Remove-Item $pkgDir -Recurse -Force -ErrorAction Ignore
+            New-Item $pkgDir -ItemType Directory -Force | Out-Null
+
+            @"
+          <?xml version="1.0"?>
+          <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+            <metadata>
+              <id>$Id</id>
+              <version>$Version</version>
+              <title>MsQuic ($TitleSuffix – all platforms)</title>
+              <authors>Microsoft</authors>
+              <license type="expression">MIT</license>
+              <projectUrl>https://github.com/microsoft/msquic</projectUrl>
+              <requireLicenseAcceptance>true</requireLicenseAcceptance>
+              <copyright>© Microsoft Corporation. All rights reserved.</copyright>
+              <description>Aggregate meta-package pulling in native MsQuic binaries for Windows, Linux, and macOS (TLS: $TitleSuffix)</description>
+              <repository type="git" url="$RepoRemote" commit="$CommitHash" />
+              <tags>native quic msquic allplatforms</tags>
+              <dependencies>
+                <group targetFramework="native">
+                  <dependency id="$WinDep" version="[$Version]" />
+                  <dependency id="Microsoft.Native.Quic.MsQuic.Linux" version="[$Version]" />
+                  <dependency id="Microsoft.Native.Quic.MsQuic.macOS" version="[$Version]" />
+                </group>
+              </dependencies>
+            </metadata>
+          </package>
+"@ | Out-File "$pkgDir/$Id.nuspec" -Encoding UTF8
+
+            nuget pack "$pkgDir/$Id.nuspec" `
+              -OutputDirectory $DistDir `
+              -BasePath $pkgDir `
+              -Version $Version
+          }
+
+          New-MetaPackage "Microsoft.Native.Quic.MsQuic.AllPlatforms.Schannel" `
+            "Microsoft.Native.Quic.MsQuic.Schannel" "Schannel"
+
+          New-MetaPackage "Microsoft.Native.Quic.MsQuic.AllPlatforms.QuicTls" `
+            "Microsoft.Native.Quic.MsQuic.QuicTls" "QuicTls"
+
+          Write-Host "=== Meta NuGet packages ==="
+          Get-ChildItem $DistDir
+
+      - name: Push to GitHub NuGet registry
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          $source = "https://nuget.pkg.github.com/$env:GITHUB_REPOSITORY_OWNER/index.json"
+          Get-ChildItem "dist/*.nupkg" | ForEach-Object {
+            nuget push $_.FullName -Source $source -ApiKey $env:GITHUB_TOKEN -SkipDuplicate
+          }
+
+  #############################################################################
   # COMPLETE sentinel – validates every job passed
   #############################################################################
   complete:
     if: always()
-    needs: [build, linux-arm64, nuget-windows, nuget-linux, nuget-macos]
+    needs: [build, linux-arm64, nuget-windows, nuget-linux, nuget-macos, nuget-meta]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
