@@ -47,6 +47,12 @@ jobs:
             arch: x64
             tls: quictls
 
+          - name: windows-arm64-quictls
+            os: windows-2022
+            platform: windows
+            arch: arm64
+            tls: quictls
+
           - name: linux-amd64
             os: ubuntu-22.04
             platform: linux
@@ -172,7 +178,7 @@ jobs:
   # NUGET PACKAGING – produce all .nupkg in one job, push once
   #############################################################################
   nuget:
-    needs: [build, linux-arm64]
+    needs: [build]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -197,22 +203,7 @@ jobs:
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: linux-amd64
-          path: src/artifacts
-
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: linux-arm64
-          path: src/artifacts
-
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: macos-amd64
-          path: src/artifacts
-
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: macos-arm64
+          name: windows-arm64-quictls
           path: src/artifacts
 
       - uses: nuget/setup-nuget@fd55a6f3b34392fa83fde1454582407d8c714123 # v4.0
@@ -237,43 +228,28 @@ jobs:
 
           New-Item $DistDir -ItemType Directory -Force | Out-Null
 
-          # ── Windows Schannel (x64 + arm64) ──────────────────────────────
-          Write-Host "=== Packaging Windows (Schannel) ==="
-          $WinPlatformDir = "$ArtifactsDir/bin/windows"
-          function New-WinPkg { param($Tls, $Archs)
-            $p = "$ArtifactsDir/temp/nuget/$Tls"
+          function New-MsQuicPkg {
+            param([string]$Tls, [array]$WinArchs)
+            $title = $Tls.Substring(0,1).ToUpper() + $Tls.Substring(1)
+            $p = "$ArtifactsDir/temp/nuget/$title"
             Remove-Item $p -Recurse -Force -ErrorAction Ignore
-            foreach ($a in $Archs) { New-Item "$p/build/native/lib/$a","$p/build/native/bin/$a" -Type Dir -Force | Out-Null }
+            foreach ($a in $WinArchs) {
+              New-Item "$p/runtimes/win-$a/native" -Type Dir -Force | Out-Null
+            }
             New-Item "$p/build/native/include" -Type Dir -Force | Out-Null
-            foreach ($a in $Archs) {
-              $b = "$WinPlatformDir/${a}_Release_${Tls}"
-              Copy-Item "$b/msquic.dll","$b/msquic.pdb" "$p/build/native/bin/$a/"
-              Copy-Item "$b/msquic.lib" "$p/build/native/lib/$a/"
+
+            foreach ($a in $WinArchs) {
+              $srcBin = "$ArtifactsDir/bin/windows/${a}_Release_${Tls}"
+              Copy-Item "$srcBin/msquic.dll","$srcBin/msquic.pdb","$srcBin/msquic.lib" "$p/runtimes/win-$a/native/"
             }
+
             foreach ($h in @("msquic.h","msquicp.h","msquic.hpp","msquic_winuser.h")) {
-              Copy-Item "$Root/src/inc/$h" "$p/build/native/include/"
+              $s = "$Root/src/inc/$h"
+              if (Test-Path $s) { Copy-Item $s "$p/build/native/include/" }
             }
-            Copy-Item "$Root/LICENSE","$Root/src/distribution/pkgicon.png" $p
-            $L = "$($Tls.Substring(0,1).ToUpper())$($Tls.Substring(1))"
-            @"
-          <?xml version="1.0"?>
-          <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
-            <metadata>
-              <id>MsQuicBuilds.Native.$L</id>
-              <version>$Version</version>
-              <title>MsQuic ($L)</title>
-              <authors>Microsoft</authors>
-              <license type="expression">MIT</license>
-              <icon>pkgicon.png</icon>
-              <projectUrl>https://github.com/microsoft/msquic</projectUrl>
-              <requireLicenseAcceptance>true</requireLicenseAcceptance>
-              <copyright>© Microsoft Corporation. All rights reserved.</copyright>
-              <description>MsQuic native library for $($Archs -join ', ') using $Tls for TLS</description>
-              <repository type="git" url="$RepoRemote" commit="$CommitHash" />
-              <tags>native quic msquic $Tls</tags>
-            </metadata>
-          </package>
-          "@ | Set-Content "$p/MsQuicBuilds.Native.$L.nuspec" -Encoding UTF8
+            Copy-Item "$Root/LICENSE" $p
+            $hasIcon = Test-Path "$Root/src/distribution/pkgicon.png"
+            if ($hasIcon) { Copy-Item "$Root/src/distribution/pkgicon.png" $p }
 
             $tl = @(
               '<?xml version="1.0" encoding="utf-8"?>',
@@ -283,143 +259,58 @@ jobs:
               '      <AdditionalIncludeDirectories>`$(MSBuildThisFileDirectory)include/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>',
               '    </ClCompile>'
             )
-            foreach ($a in $Archs) {
+            foreach ($a in $WinArchs) {
               $tl += "    <Link Condition=""'`$(Platform.ToLower())' == '$a'"">"
-              $tl += "      <AdditionalDependencies>`$(MSBuildThisFileDirectory)lib/$a/msquic.lib;%(AdditionalDependencies)</AdditionalDependencies>"
+              $tl += "      <AdditionalDependencies>`$(MSBuildThisFileDirectory)../../runtimes/win-$a/native/msquic.lib;%(AdditionalDependencies)</AdditionalDependencies>"
               $tl += "    </Link>"
             }
             $tl += '  </ItemDefinitionGroup>'
             $tl += '  <Target Name="msquic_AfterBuild" AfterTargets="AfterBuild" />'
-            foreach ($a in $Archs) {
-              $rid = "win-$a"
-              $tl += "  <Target Name=""msquic_AfterBuild_$a"" Label=""$a"" Condition=""'`$(RuntimeIdentifier)' == '$rid' Or '`$(Platform.ToLower())' == '$a'"" AfterTargets=""msquic_AfterBuild"">"
-              $tl += "    <Copy SourceFiles=""`$(MSBuildThisFileDirectory)bin/$a/msquic.dll"" DestinationFolder=""`$(TargetDir)"" SkipUnchangedFiles=""true"" />"
+            foreach ($a in $WinArchs) {
+              $tl += "  <Target Name=""msquic_AfterBuild_$a"" Label=""$a"" Condition=""'`$(RuntimeIdentifier)' == 'win-$a' Or '`$(Platform.ToLower())' == '$a'"" AfterTargets=""msquic_AfterBuild"">"
+              $tl += "    <Copy SourceFiles=""`$(MSBuildThisFileDirectory)../../runtimes/win-$a/native/msquic.dll"" DestinationFolder=""`$(TargetDir)"" SkipUnchangedFiles=""true"" />"
               $tl += "  </Target>"
             }
             $tl += '</Project>'
-            $tl -join "`n" | Set-Content "$p/build/native/MsQuicBuilds.Native.$L.targets" -Encoding UTF8
+            $tl -join "`n" | Set-Content "$p/build/native/MsQuicBuilds.Native.$title.targets" -Encoding UTF8
 
-            nuget pack "$p/MsQuicBuilds.Native.$L.nuspec" -OutputDirectory $DistDir -p CommitHash=$CommitHash -p RepoRemote=$RepoRemote -Version $Version
-          }
-
-          New-WinPkg -Tls schannel -Archs @("x64","arm64")
-          New-WinPkg -Tls quictls -Archs @("x64")
-
-          # ── Linux (runtimes/ layout, x64 + arm64) ───────────────────────
-          Write-Host "=== Packaging Linux ==="
-          $nixPkg = "$ArtifactsDir/temp/linux"
-          Remove-Item $nixPkg -Recurse -Force -ErrorAction Ignore
-          foreach ($a in @("x64","arm64")) {
-            New-Item "$nixPkg/runtimes/linux-$a/native" -Type Dir -Force | Out-Null
-            Copy-Item "$ArtifactsDir/bin/linux/${a}_Release_quictls/libmsquic.so" "$nixPkg/runtimes/linux-$a/native/"
-          }
-          New-Item "$nixPkg/build/native/include" -Type Dir -Force | Out-Null
-          foreach ($h in @("msquic.h","msquicp.h","msquic.hpp")) {
-            Copy-Item "$Root/src/inc/$h" "$nixPkg/build/native/include/"
-          }
-          Copy-Item "$Root/LICENSE","$Root/src/distribution/pkgicon.png" $nixPkg
-          @"
-          <?xml version="1.0"?>
-          <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
-            <metadata>
-              <id>MsQuicBuilds.Native.Linux</id>
-              <version>$Version</version>
-              <title>MsQuic (Linux)</title>
-              <authors>Microsoft</authors>
-              <license type="expression">MIT</license>
-              <icon>pkgicon.png</icon>
-              <projectUrl>https://github.com/microsoft/msquic</projectUrl>
-              <requireLicenseAcceptance>true</requireLicenseAcceptance>
-              <copyright>© Microsoft Corporation. All rights reserved.</copyright>
-              <description>MsQuic native library for linux-x64 and linux-arm64 using quictls for TLS</description>
-              <repository type="git" url="$RepoRemote" commit="$CommitHash" />
-              <tags>native quic msquic linux</tags>
-            </metadata>
-            <files>
-              <file src="runtimes/**/*" target="runtimes/" />
-              <file src="build/**/*" target="build/" />
-              <file src="LICENSE" />
-              <file src="pkgicon.png" />
-            </files>
-          </package>
-          "@ | Set-Content "$nixPkg/MsQuicBuilds.Native.Linux.nuspec" -Encoding UTF8
-          nuget pack "$nixPkg/MsQuicBuilds.Native.Linux.nuspec" -OutputDirectory $DistDir -BasePath $nixPkg -p CommitHash=$CommitHash -p RepoRemote=$RepoRemote -Version $Version
-
-          # ── macOS (runtimes/ layout, osx-x64 + osx-arm64) ───────────────
-          Write-Host "=== Packaging macOS ==="
-          $macPkg = "$ArtifactsDir/temp/macos"
-          Remove-Item $macPkg -Recurse -Force -ErrorAction Ignore
-          foreach ($e in @(@{a="x64";r="osx-x64"}, @{a="arm64";r="osx-arm64"})) {
-            New-Item "$macPkg/runtimes/$($e.r)/native" -Type Dir -Force | Out-Null
-            Copy-Item "$ArtifactsDir/bin/macos/$($e.a)_Release_quictls/libmsquic.dylib" "$macPkg/runtimes/$($e.r)/native/"
-          }
-          New-Item "$macPkg/build/native/include" -Type Dir -Force | Out-Null
-          foreach ($h in @("msquic.h","msquicp.h","msquic.hpp")) {
-            Copy-Item "$Root/src/inc/$h" "$macPkg/build/native/include/"
-          }
-          Copy-Item "$Root/LICENSE","$Root/src/distribution/pkgicon.png" $macPkg
-          @"
-          <?xml version="1.0"?>
-          <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
-            <metadata>
-              <id>MsQuicBuilds.Native.macOS</id>
-              <version>$Version</version>
-              <title>MsQuic (macOS)</title>
-              <authors>Microsoft</authors>
-              <license type="expression">MIT</license>
-              <icon>pkgicon.png</icon>
-              <projectUrl>https://github.com/microsoft/msquic</projectUrl>
-              <requireLicenseAcceptance>true</requireLicenseAcceptance>
-              <copyright>© Microsoft Corporation. All rights reserved.</copyright>
-              <description>MsQuic native library for osx-x64 and osx-arm64 using quictls for TLS</description>
-              <repository type="git" url="$RepoRemote" commit="$CommitHash" />
-              <tags>native quic msquic macos</tags>
-            </metadata>
-            <files>
-              <file src="runtimes/**/*" target="runtimes/" />
-              <file src="build/**/*" target="build/" />
-              <file src="LICENSE" />
-              <file src="pkgicon.png" />
-            </files>
-          </package>
-          "@ | Set-Content "$macPkg/MsQuicBuilds.Native.macOS.nuspec" -Encoding UTF8
-          nuget pack "$macPkg/MsQuicBuilds.Native.macOS.nuspec" -OutputDirectory $DistDir -BasePath $macPkg -p CommitHash=$CommitHash -p RepoRemote=$RepoRemote -Version $Version
-
-          # ── Meta packages (aggregate all platforms) ─────────────────────
-          Write-Host "=== Packaging Meta ==="
-          function New-MetaPkg([string]$Id, [string]$WinDep, [string]$Title) {
-            $d = "$ArtifactsDir/temp/meta/$Id"
-            Remove-Item $d -Recurse -Force -ErrorAction Ignore
-            New-Item $d -Type Dir -Force | Out-Null
+            $rids = ($WinArchs | ForEach-Object { "win-$_" }) -join ', '
+            $iconMeta = if ($hasIcon) { "    <icon>pkgicon.png</icon>" } else { "" }
+            $iconFile = if ($hasIcon) { "    <file src=`"pkgicon.png`" />" } else { "" }
             @"
           <?xml version="1.0"?>
           <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
             <metadata>
-              <id>$Id</id>
+              <id>MsQuicBuilds.Native.$title</id>
               <version>$Version</version>
-              <title>MsQuic ($Title – all platforms)</title>
+              <title>MsQuic ($title)</title>
               <authors>Microsoft</authors>
               <license type="expression">MIT</license>
+$iconMeta
               <projectUrl>https://github.com/microsoft/msquic</projectUrl>
               <requireLicenseAcceptance>true</requireLicenseAcceptance>
               <copyright>© Microsoft Corporation. All rights reserved.</copyright>
-              <description>Aggregate meta-package pulling in native MsQuic binaries for Windows, Linux, and macOS (TLS: $Title)</description>
+              <description>MsQuic native library for $rids using $title for TLS</description>
               <repository type="git" url="$RepoRemote" commit="$CommitHash" />
-              <tags>native quic msquic allplatforms</tags>
-              <dependencies>
-                <group targetFramework="native">
-                  <dependency id="$WinDep" version="[$Version]" />
-                  <dependency id="MsQuicBuilds.Native.Linux" version="[$Version]" />
-                  <dependency id="MsQuicBuilds.Native.macOS" version="[$Version]" />
-                </group>
-              </dependencies>
+              <tags>native quic msquic $Tls</tags>
             </metadata>
+            <files>
+              <file src="runtimes/**/*" target="runtimes/" />
+              <file src="build/**/*" target="build/" />
+              <file src="LICENSE" />
+$iconFile
+            </files>
           </package>
-          "@ | Set-Content "$d/$Id.nuspec" -Encoding UTF8
-            nuget pack "$d/$Id.nuspec" -OutputDirectory $DistDir -BasePath $d -Version $Version
+          "@ | Set-Content "$p/MsQuicBuilds.Native.$title.nuspec" -Encoding UTF8
+
+            nuget pack "$p/MsQuicBuilds.Native.$title.nuspec" -OutputDirectory $DistDir -BasePath $p -Version $Version
           }
-          New-MetaPkg "MsQuicBuilds.Native.AllPlatforms.Schannel" "MsQuicBuilds.Native.Schannel" "Schannel"
-          New-MetaPkg "MsQuicBuilds.Native.AllPlatforms.QuicTls" "MsQuicBuilds.Native.Quictls" "QuicTls"
+
+          Write-Host "=== Packaging MsQuicBuilds.Native.Schannel ==="
+          New-MsQuicPkg -Tls schannel -WinArchs @("x64","arm64")
+
+          Write-Host "=== Packaging MsQuicBuilds.Native.Quictls ==="
+          New-MsQuicPkg -Tls quictls -WinArchs @("x64","arm64")
 
           Write-Host "=== All NuGet packages ==="
           Get-ChildItem $DistDir

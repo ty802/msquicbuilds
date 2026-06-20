@@ -27,16 +27,22 @@ jobs:
 
       - name: Install deps
         run: |
+          set -e
           apt-get update -qq
-          apt-get install -y -qq wget curl cmake build-essential liblttng-ust-dev lttng-tools libssl-dev libnuma-dev
-          wget -q https://github.com/PowerShell/PowerShell/releases/download/v7.4.7/powershell-7.4.7-linux-x64.tar.gz -O /tmp/pwsh.tar.gz
+          apt-get install -y -qq curl cmake build-essential liblttng-ust-dev lttng-tools libssl-dev libnuma-dev
+          curl -fsSL https://github.com/PowerShell/PowerShell/releases/download/v7.4.7/powershell-7.4.7-linux-x64.tar.gz -o /tmp/pwsh.tar.gz
           mkdir -p /opt/microsoft/powershell/7
           tar -xzf /tmp/pwsh.tar.gz -C /opt/microsoft/powershell/7
-          ln -sf /opt/microsoft/powershell/7/pwsh /usr/bin/pwsh
+          ln -sf /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh
+          pwsh --version
 
       - name: Install cross-compiler (aarch64 only)
         if: matrix.arch == 'aarch64'
-        run: apt-get install -y -qq gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+        run: |
+          dpkg --add-architecture arm64
+          apt-get update -qq
+          apt-get install -y -qq gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+            liblttng-ust-dev:arm64 libssl-dev:arm64 libnuma-dev:arm64
 
       - name: Build
         shell: pwsh
@@ -46,8 +52,26 @@ jobs:
           if ($arch -eq 'aarch64') { $arch = 'arm64' } else { $arch = 'x64' }
           scripts/build.ps1 -Config Release -Platform linux -Arch $arch -Tls quictls -DisableTools -DisableTest -DisablePerf
 
-      - name: Upload raw artifacts
+      - name: Package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $arch = "${{ matrix.arch }}"
+          if ($arch -eq 'aarch64') { $a = 'arm64' } else { $a = 'x64' }
+          $root = Resolve-Path "."
+          $staging = "$root/staging"
+          $libdir = "$staging/lib"
+          $incdir = "$staging/include"
+          $pkgdir = "$root/pkg"
+          New-Item $libdir,$incdir,$pkgdir -ItemType Directory -Force | Out-Null
+          Copy-Item "$root/src/artifacts/bin/linux/${a}_Release_quictls/libmsquic.so*" $libdir/
+          Copy-Item "$root/src/src/inc/msquic.h","$root/src/src/inc/msquicp.h","$root/src/src/inc/msquic.hpp" $incdir/
+          Copy-Item "$root/src/LICENSE" $staging/
+          tar -czf "$pkgdir/msquic-steamrt4-$arch.tar.gz" -C $staging .
+          echo "Packaged msquic-steamrt4-$arch.tar.gz"
+
+      - name: Upload packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: steamrt4-${{ matrix.arch }}
-          path: src/artifacts/
+          path: pkg/
