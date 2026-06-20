@@ -291,7 +291,8 @@ jobs:
             $tl += '  </ItemDefinitionGroup>'
             $tl += '  <Target Name="msquic_AfterBuild" AfterTargets="AfterBuild" />'
             foreach ($a in $Archs) {
-              $tl += "  <Target Name=""msquic_AfterBuild_$a"" Label=""$a"" Condition=""'`$(Platform.ToLower())' == '$a'"" AfterTargets=""msquic_AfterBuild"">"
+              $rid = "win-$a"
+              $tl += "  <Target Name=""msquic_AfterBuild_$a"" Label=""$a"" Condition=""'`$(RuntimeIdentifier)' == '$rid' Or '`$(Platform.ToLower())' == '$a'"" AfterTargets=""msquic_AfterBuild"">"
               $tl += "    <Copy SourceFiles=""`$(MSBuildThisFileDirectory)bin/$a/msquic.dll"" DestinationFolder=""`$(TargetDir)"" SkipUnchangedFiles=""true"" />"
               $tl += "  </Target>"
             }
