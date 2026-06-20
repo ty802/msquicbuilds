@@ -399,7 +399,6 @@ jobs:
               <title>MsQuic ($Title – all platforms)</title>
               <authors>Microsoft</authors>
               <license type="expression">MIT</license>
-              <icon>pkgicon.png</icon>
               <projectUrl>https://github.com/microsoft/msquic</projectUrl>
               <requireLicenseAcceptance>true</requireLicenseAcceptance>
               <copyright>© Microsoft Corporation. All rights reserved.</copyright>
