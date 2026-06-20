@@ -65,7 +65,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout msquic
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: microsoft/msquic
           submodules: false
@@ -101,7 +101,7 @@ jobs:
 
       - name: Install NASM (Windows quictls)
         if: runner.os == 'Windows' && matrix.tls != 'schannel'
-        uses: ilammy/setup-nasm@v1
+        uses: ilammy/setup-nasm@72793074d3c8cdda771dba85f6deafe00623038b # v1.5.2
 
       - name: Install Perl (Windows quictls — needed by OpenSSL build)
         if: runner.os == 'Windows' && matrix.tls != 'schannel'
@@ -119,7 +119,7 @@ jobs:
           }
 
       - name: Upload raw artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.name }}
           path: src/artifacts/
@@ -133,7 +133,7 @@ jobs:
       image: ghcr.io/microsoft/msquic/linux-build-xcomp:ubuntu-22.04-cross
     steps:
       - name: Checkout msquic
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: microsoft/msquic
           submodules: false
@@ -154,7 +154,7 @@ jobs:
         run: scripts/build.ps1 -Config Release -Platform linux -Arch arm64 -Tls quictls -DisableTools -DisableTest -DisablePerf -OneBranch
 
       - name: Upload raw artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: linux-arm64
           path: src/artifacts/
@@ -167,31 +167,31 @@ jobs:
     runs-on: windows-2022
     steps:
       - name: Checkout msquic (headers + distribution metadata)
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: microsoft/msquic
           path: src
 
       - name: Download Windows amd64 (schannel) artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: windows-amd64
           path: src/artifacts
 
       - name: Download Windows arm64 (schannel) artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: windows-arm64
           path: src/artifacts
 
       - name: Download Windows amd64 (quictls) artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: windows-amd64-quictls
           path: src/artifacts
 
       - name: Install NuGet CLI
-        uses: nuget/setup-nuget@v4
+        uses: nuget/setup-nuget@fd55a6f3b34392fa83fde1454582407d8c714123 # v4.0
         with:
           nuget-version: latest
 
@@ -309,7 +309,7 @@ jobs:
           Get-ChildItem $DistDir
 
       - name: Upload NuGet packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nuget-windows
           path: src/artifacts/dist/*.nupkg
@@ -335,25 +335,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout msquic (headers + distribution metadata)
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: microsoft/msquic
           path: src
 
       - name: Download linux-amd64 artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: linux-amd64
           path: src/artifacts
 
       - name: Download linux-arm64 artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: linux-arm64
           path: src/artifacts
 
       - name: Install NuGet CLI
-        uses: nuget/setup-nuget@v4
+        uses: nuget/setup-nuget@fd55a6f3b34392fa83fde1454582407d8c714123 # v4.0
         with:
           nuget-version: latest
 
@@ -447,25 +447,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout msquic (headers + distribution metadata)
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: microsoft/msquic
           path: src
 
       - name: Download macOS amd64 artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: macos-amd64
           path: src/artifacts
 
       - name: Download macOS arm64 artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: macos-arm64
           path: src/artifacts
 
       - name: Install NuGet CLI
-        uses: nuget/setup-nuget@v4
+        uses: nuget/setup-nuget@fd55a6f3b34392fa83fde1454582407d8c714123 # v4.0
         with:
           nuget-version: latest
 
@@ -559,13 +559,13 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout msquic (to grab version metadata)
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: microsoft/msquic
           path: src
 
       - name: Install NuGet CLI
-        uses: nuget/setup-nuget@v4
+        uses: nuget/setup-nuget@fd55a6f3b34392fa83fde1454582407d8c714123 # v4.0
         with:
           nuget-version: latest
 
@@ -620,7 +620,7 @@ jobs:
             "Microsoft.Native.Quic.MsQuic.Schannel" "Schannel"
 
           New-MetaPackage "Microsoft.Native.Quic.MsQuic.AllPlatforms.QuicTls" `
-            "Microsoft.Native.Quic.MsQuic.QuicTls" "QuicTls"
+            "Microsoft.Native.Quic.MsQuic.Quictls" "QuicTls"
 
           Write-Host "=== Meta NuGet packages ==="
           Get-ChildItem $DistDir
