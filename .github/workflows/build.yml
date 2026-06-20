@@ -331,6 +331,8 @@ jobs:
       - name: Push to GitHub NuGet registry
         if: github.event_name != 'pull_request'
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         working-directory: src
         run: |
           $source = "https://nuget.pkg.github.com/$env:GITHUB_REPOSITORY_OWNER/index.json"
@@ -451,6 +453,8 @@ jobs:
       - name: Push to GitHub NuGet registry
         if: github.event_name != 'pull_request'
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $source = "https://nuget.pkg.github.com/$env:GITHUB_REPOSITORY_OWNER/index.json"
           dotnet nuget add source "$source" --name github --username $env:GITHUB_REPOSITORY_OWNER --password $env:GITHUB_TOKEN --store-password-in-clear-text
@@ -567,6 +571,8 @@ jobs:
       - name: Push to GitHub NuGet registry
         if: github.event_name != 'pull_request'
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $source = "https://nuget.pkg.github.com/$env:GITHUB_REPOSITORY_OWNER/index.json"
           dotnet nuget add source "$source" --name github --username $env:GITHUB_REPOSITORY_OWNER --password $env:GITHUB_TOKEN --store-password-in-clear-text
@@ -660,6 +666,8 @@ jobs:
       - name: Push to GitHub NuGet registry
         if: github.event_name != 'pull_request'
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $source = "https://nuget.pkg.github.com/$env:GITHUB_REPOSITORY_OWNER/index.json"
           dotnet nuget add source "$source" --name github --username $env:GITHUB_REPOSITORY_OWNER --password $env:GITHUB_TOKEN --store-password-in-clear-text
