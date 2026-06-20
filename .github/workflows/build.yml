@@ -407,22 +407,9 @@ jobs:
               <repository type="git" url="$RepoRemote" commit="$CommitHash" />
               <tags>native quic msquic allplatforms</tags>
               <dependencies>
-                <group targetFramework="native" runtime="win-x64">
+                <group targetFramework="native">
                   <dependency id="$WinDep" version="[$Version]" />
-                </group>
-                <group targetFramework="native" runtime="win-arm64">
-                  <dependency id="$WinDep" version="[$Version]" />
-                </group>
-                <group targetFramework="native" runtime="linux-x64">
                   <dependency id="MsQuicBuilds.Native.Linux" version="[$Version]" />
-                </group>
-                <group targetFramework="native" runtime="linux-arm64">
-                  <dependency id="MsQuicBuilds.Native.Linux" version="[$Version]" />
-                </group>
-                <group targetFramework="native" runtime="osx-x64">
-                  <dependency id="MsQuicBuilds.Native.macOS" version="[$Version]" />
-                </group>
-                <group targetFramework="native" runtime="osx-arm64">
                   <dependency id="MsQuicBuilds.Native.macOS" version="[$Version]" />
                 </group>
               </dependencies>
