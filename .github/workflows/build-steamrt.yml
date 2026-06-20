@@ -46,7 +46,7 @@ jobs:
       - name: Build
         shell: pwsh
         working-directory: src
-        run: scripts/build.ps1 -Config Release -Platform linux -Arch ${{ matrix.msquic_arch }} -Tls quictls -DisableTools -DisableTest -DisablePerf
+        run: scripts/build.ps1 -Config Release -Platform linux -Arch ${{ matrix.msquic_arch }} -Tls quictls -DisableTools -DisableTest -DisablePerf ${{ matrix.msquic_arch == 'arm64' && '-OneBranch' || '' }}
 
       - name: Package
         shell: pwsh
