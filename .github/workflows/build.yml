@@ -106,7 +106,7 @@ jobs:
         working-directory: src
         run: |
           $gen = if ($env:RUNNER_OS -eq 'Windows') { '-Generator "Visual Studio 17 2022"' } else { '' }
-          scripts/build.ps1 -Config Release -Platform ${{ matrix.platform }} -Arch ${{ matrix.arch }} -Tls ${{ matrix.tls }} $gen
+          scripts/build.ps1 -Config Release -Platform ${{ matrix.platform }} -Arch ${{ matrix.arch }} -Tls ${{ matrix.tls }} -DisableTools -DisableTest -DisablePerf $gen
 
       - name: Upload raw artifacts
         uses: actions/upload-artifact@v4
@@ -137,7 +137,7 @@ jobs:
       - name: Build (cross-compile)
         shell: pwsh
         working-directory: src
-        run: scripts/build.ps1 -Config Release -Platform linux -Arch arm64 -Tls quictls -OneBranch
+        run: scripts/build.ps1 -Config Release -Platform linux -Arch arm64 -Tls quictls -DisableTools -DisableTest -DisablePerf -OneBranch
 
       - name: Upload raw artifacts
         uses: actions/upload-artifact@v4
