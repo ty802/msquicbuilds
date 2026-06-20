@@ -1,0 +1,277 @@
+name: build msquic
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  #############################################################################
+  # NATIVE BUILDS: runs directly on the target OS runner
+  #############################################################################
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-amd64
+            os: windows-2022
+            platform: windows
+            arch: x64
+            tls: schannel
+
+          - name: windows-arm64
+            os: windows-2022
+            platform: windows
+            arch: arm64
+            tls: schannel
+
+          - name: linux-amd64
+            os: ubuntu-22.04
+            platform: linux
+            arch: x64
+            tls: quictls
+
+          - name: macos-amd64
+            os: macos-13
+            platform: macos
+            arch: x64
+            tls: quictls
+
+          - name: macos-arm64
+            os: macos-14
+            platform: macos
+            arch: arm64
+            tls: quictls
+
+          - name: android-arm64
+            os: ubuntu-22.04
+            platform: android
+            arch: arm64
+            tls: quictls
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout msquic
+        uses: actions/checkout@v4
+        with:
+          repository: microsoft/msquic
+          submodules: recursive
+          fetch-depth: 0
+          path: src
+
+      - name: Install deps (Linux native)
+        if: runner.os == 'Linux' && matrix.platform == 'linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake build-essential liblttng-ust-dev lttng-tools libssl-dev libnuma-dev
+
+      - name: Setup Android NDK
+        if: matrix.platform == 'android'
+        run: |
+          curl -sSL https://dl.google.com/android/repository/android-ndk-r27c-linux.zip -o /tmp/ndk.zip
+          unzip -q /tmp/ndk.zip -d /opt
+          echo "ANDROID_NDK_LATEST_HOME=/opt/android-ndk-r27c" >> "$GITHUB_ENV"
+
+      - name: Install deps (Android)
+        if: matrix.platform == 'android'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq cmake build-essential
+
+      - name: Build
+        shell: pwsh
+        working-directory: src
+        run: scripts/build.ps1 -Config Release -Platform ${{ matrix.platform }} -Arch ${{ matrix.arch }} -Tls ${{ matrix.tls }}
+
+      - name: Upload raw artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: src/artifacts/
+
+  #############################################################################
+  # LINUX ARM64 CROSS-COMPILE (needs the msquic cross-compile Docker image)
+  #############################################################################
+  linux-arm64:
+    runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/microsoft/msquic/linux-build-xcomp:ubuntu-22.04-cross
+    steps:
+      - name: Checkout msquic
+        uses: actions/checkout@v4
+        with:
+          repository: microsoft/msquic
+          submodules: recursive
+          fetch-depth: 0
+          path: src
+
+      - name: Fix git ownership
+        run: chown -R $(id -u):$(id -g) src/
+        shell: bash
+
+      - name: Build (cross-compile)
+        shell: pwsh
+        working-directory: src
+        run: scripts/build.ps1 -Config Release -Platform linux -Arch arm64 -Tls quictls -OneBranch
+
+      - name: Upload raw artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64
+          path: src/artifacts/
+
+  #############################################################################
+  # NUGET PACKAGING (Windows only – combines x64 + arm64 into .nupkg)
+  #############################################################################
+  nuget-windows:
+    needs: [build]
+    runs-on: windows-2022
+    steps:
+      - name: Checkout msquic (headers + distribution metadata)
+        uses: actions/checkout@v4
+        with:
+          repository: microsoft/msquic
+          path: src
+
+      - name: Download Windows amd64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-amd64
+          path: src/artifacts
+
+      - name: Download Windows arm64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-arm64
+          path: src/artifacts
+
+      - name: Package NuGet
+        shell: pwsh
+        working-directory: src
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Tls = "schannel"
+          $Config = "Release"
+          $Root = Resolve-Path "."
+          $ArtifactsDir = "$Root/artifacts"
+          $PlatformDir = "$ArtifactsDir/bin/windows"
+          $PackagingDir = "$ArtifactsDir/temp/nuget"
+          $DistDir = "$ArtifactsDir/dist"
+
+          # Architectures we built (no x86 – user requested amd64 + arm64 only)
+          $Archs = @("x64", "arm64")
+
+          # Clean & create layout
+          Remove-Item $PackagingDir -Recurse -Force -ErrorAction Ignore
+          foreach ($Arch in $Archs) {
+            New-Item -Path "$PackagingDir/build/native/lib/$Arch" -ItemType Directory -Force | Out-Null
+            New-Item -Path "$PackagingDir/build/native/bin/$Arch" -ItemType Directory -Force | Out-Null
+          }
+          New-Item -Path "$PackagingDir/build/native/include" -ItemType Directory -Force | Out-Null
+          New-Item -Path $DistDir -ItemType Directory -Force | Out-Null
+
+          # Copy binaries per architecture
+          foreach ($Arch in $Archs) {
+            $BuildPath = "$PlatformDir/${Arch}_${Config}_${Tls}"
+            Write-Host "Copying from $BuildPath"
+            Copy-Item "$BuildPath/msquic.dll"    "$PackagingDir/build/native/bin/$Arch/"
+            Copy-Item "$BuildPath/msquic.pdb"    "$PackagingDir/build/native/bin/$Arch/"
+            Copy-Item "$BuildPath/msquic.lib"    "$PackagingDir/build/native/lib/$Arch/"
+          }
+
+          # Copy public headers
+          foreach ($h in @("msquic.h", "msquicp.h", "msquic.hpp", "msquic_winuser.h")) {
+            Copy-Item "$Root/src/inc/$h" "$PackagingDir/build/native/include/"
+          }
+
+          # Copy package metadata
+          Copy-Item "$Root/LICENSE" $PackagingDir
+          Copy-Item "$Root/src/distribution/pkgicon.png" $PackagingDir
+
+          # Build a .nuspec that only lists x64 + arm64 (no x86)
+          $CommitHash = & git -C $Root rev-parse HEAD
+          $RepoRemote = "https://github.com/microsoft/msquic.git"
+          $Version = "2.6.0-ci.$env:GITHUB_RUN_NUMBER"
+
+          @"
+          <?xml version="1.0"?>
+          <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+            <metadata>
+              <id>Microsoft.Native.Quic.MsQuic.Schannel</id>
+              <version>$Version</version>
+              <title>MsQuic (Schannel)</title>
+              <authors>Microsoft</authors>
+              <license type="expression">MIT</license>
+              <icon>pkgicon.png</icon>
+              <readme>README.md</readme>
+              <projectUrl>https://github.com/microsoft/msquic</projectUrl>
+              <requireLicenseAcceptance>true</requireLicenseAcceptance>
+              <copyright>© Microsoft Corporation. All rights reserved.</copyright>
+              <description>MsQuic native library for x64 and arm64 using schannel for TLS</description>
+              <repository type="git" url="$RepoRemote" commit="$CommitHash" />
+              <tags>native quic msquic schannel</tags>
+            </metadata>
+          </package>
+          "@ | Set-Content "$PackagingDir/Microsoft.Native.Quic.MsQuic.Schannel.nuspec" -Encoding UTF8
+
+          # Build a .targets that only maps x64 and arm64 (no win32/x86)
+          @"
+          <?xml version="1.0" encoding="utf-8"?>
+          <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+            <ItemDefinitionGroup>
+              <ClCompile>
+                <AdditionalIncludeDirectories>`$(MSBuildThisFileDirectory)include/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+              </ClCompile>
+              <Link Condition="'`$(Platform.ToLower())' == 'x64'">
+                <AdditionalDependencies>`$(MSBuildThisFileDirectory)lib/x64/msquic.lib;%(AdditionalDependencies)</AdditionalDependencies>
+              </Link>
+              <Link Condition="'`$(Platform.ToLower())' == 'arm64'">
+                <AdditionalDependencies>`$(MSBuildThisFileDirectory)lib/arm64/msquic.lib;%(AdditionalDependencies)</AdditionalDependencies>
+              </Link>
+            </ItemDefinitionGroup>
+            <Target Name="msquic_AfterBuild" AfterTargets="AfterBuild" />
+            <Target Name="msquic_AfterBuild_x64" Label="x64" Condition="'`$(Platform.ToLower())' == 'x64'" AfterTargets="msquic_AfterBuild">
+              <Copy SourceFiles="`$(MSBuildThisFileDirectory)bin/x64/msquic.dll" DestinationFolder="`$(TargetDir)" SkipUnchangedFiles="true" />
+            </Target>
+            <Target Name="msquic_AfterBuild_arm64" Label="arm64" Condition="'`$(Platform.ToLower())' == 'arm64'" AfterTargets="msquic_AfterBuild">
+              <Copy SourceFiles="`$(MSBuildThisFileDirectory)bin/arm64/msquic.dll" DestinationFolder="`$(TargetDir)" SkipUnchangedFiles="true" />
+            </Target>
+          </Project>
+          "@ | Set-Content "$PackagingDir/build/native/Microsoft.Native.Quic.MsQuic.Schannel.targets" -Encoding UTF8
+
+          # Pack
+          nuget pack "$PackagingDir/Microsoft.Native.Quic.MsQuic.Schannel.nuspec" `
+            -OutputDirectory $DistDir `
+            -p CommitHash=$CommitHash `
+            -p RepoRemote=$RepoRemote `
+            -Version $Version
+
+          Write-Host "=== NuGet packages ==="
+          Get-ChildItem $DistDir
+
+      - name: Upload NuGet packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-windows-schannel
+          path: src/artifacts/dist/*.nupkg
+
+  #############################################################################
+  # COMPLETE sentinel – validates every job passed
+  #############################################################################
+  complete:
+    if: always()
+    needs: [build, linux-arm64, nuget-windows]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}
