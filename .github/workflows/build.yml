@@ -334,11 +334,12 @@ jobs:
         working-directory: src
         run: |
           $source = "https://nuget.pkg.github.com/$env:GITHUB_REPOSITORY_OWNER/index.json"
+          dotnet nuget add source "$source" --name github --username $env:GITHUB_REPOSITORY_OWNER --password $env:GITHUB_TOKEN --store-password-in-clear-text
           $dist = "artifacts/dist"
           Write-Host "Pushing packages to $source"
           Get-ChildItem "$dist/*.nupkg" | ForEach-Object {
             Write-Host "  pushing $($_.Name)"
-            dotnet nuget push $_.FullName --source $source --api-key $env:GITHUB_TOKEN --skip-duplicate
+            dotnet nuget push $_.FullName --source github --skip-duplicate
           }
 
   #############################################################################
@@ -452,10 +453,11 @@ jobs:
         shell: pwsh
         run: |
           $source = "https://nuget.pkg.github.com/$env:GITHUB_REPOSITORY_OWNER/index.json"
+          dotnet nuget add source "$source" --name github --username $env:GITHUB_REPOSITORY_OWNER --password $env:GITHUB_TOKEN --store-password-in-clear-text
           Write-Host "Pushing to $source"
           Get-ChildItem "dist/*.nupkg" | ForEach-Object {
             Write-Host "  pushing $($_.Name)"
-            dotnet nuget push $_.FullName --source $source --api-key $env:GITHUB_TOKEN --skip-duplicate
+            dotnet nuget push $_.FullName --source github --skip-duplicate
           }
 
   #############################################################################
@@ -567,10 +569,11 @@ jobs:
         shell: pwsh
         run: |
           $source = "https://nuget.pkg.github.com/$env:GITHUB_REPOSITORY_OWNER/index.json"
+          dotnet nuget add source "$source" --name github --username $env:GITHUB_REPOSITORY_OWNER --password $env:GITHUB_TOKEN --store-password-in-clear-text
           Write-Host "Pushing to $source"
           Get-ChildItem "dist/*.nupkg" | ForEach-Object {
             Write-Host "  pushing $($_.Name)"
-            dotnet nuget push $_.FullName --source $source --api-key $env:GITHUB_TOKEN --skip-duplicate
+            dotnet nuget push $_.FullName --source github --skip-duplicate
           }
 
   #############################################################################
@@ -659,8 +662,9 @@ jobs:
         shell: pwsh
         run: |
           $source = "https://nuget.pkg.github.com/$env:GITHUB_REPOSITORY_OWNER/index.json"
+          dotnet nuget add source "$source" --name github --username $env:GITHUB_REPOSITORY_OWNER --password $env:GITHUB_TOKEN --store-password-in-clear-text
           Get-ChildItem "dist/*.nupkg" | ForEach-Object {
-            dotnet nuget push $_.FullName --source $source --api-key $env:GITHUB_TOKEN --skip-duplicate
+            dotnet nuget push $_.FullName --source github --skip-duplicate
           }
 
   #############################################################################
