@@ -45,13 +45,13 @@ jobs:
             tls: quictls
 
           - name: macos-amd64
-            os: macos-13
+            os: macos-15
             platform: macos
             arch: x64
             tls: quictls
 
           - name: macos-arm64
-            os: macos-14
+            os: macos-15
             platform: macos
             arch: arm64
             tls: quictls
