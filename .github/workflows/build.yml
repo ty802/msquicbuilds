@@ -2,6 +2,15 @@ name: build msquic
 
 on:
   workflow_dispatch:
+    inputs:
+      msquic_version:
+        description: 'MsQuic base version (e.g. 2.6.0)'
+        required: false
+        default: '2.6.0'
+      msquic_ref:
+        description: 'MsQuic git ref (branch/tag/commit)'
+        required: false
+        default: ''
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
@@ -195,6 +204,11 @@ jobs:
         with:
           nuget-version: latest
 
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@87b7050dc53f08240a4e88c1e0f3c7bfe50ed871 # v4.0
+        with:
+          dotnet-version: 8.x
+
       - name: Package NuGet
         shell: pwsh
         working-directory: src
@@ -207,7 +221,7 @@ jobs:
           $DistDir = "$ArtifactsDir/dist"
           $CommitHash = & git -C $Root rev-parse HEAD
           $RepoRemote = "https://github.com/microsoft/msquic.git"
-          $Version = "2.6.0-ci.$env:GITHUB_RUN_NUMBER"
+          $Version = "${{ github.event.inputs.msquic_version }}-ci.$env:GITHUB_RUN_NUMBER"
 
           $CommonHeaders = @("msquic.h", "msquicp.h", "msquic.hpp", "msquic_winuser.h")
 
@@ -357,6 +371,11 @@ jobs:
         with:
           nuget-version: latest
 
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@87b7050dc53f08240a4e88c1e0f3c7bfe50ed871 # v4.0
+        with:
+          dotnet-version: 8.x
+
       - name: Create & publish Linux NuGet packages
         shell: pwsh
         run: |
@@ -367,7 +386,7 @@ jobs:
           $DistDir = "dist"
           $CommitHash = & git -C $Root rev-parse HEAD
           $RepoRemote = "https://github.com/microsoft/msquic.git"
-          $Version = "2.6.0-ci.$env:GITHUB_RUN_NUMBER"
+          $Version = "${{ github.event.inputs.msquic_version }}-ci.$env:GITHUB_RUN_NUMBER"
 
           New-Item -Path $DistDir -ItemType Directory -Force | Out-Null
 
@@ -469,6 +488,11 @@ jobs:
         with:
           nuget-version: latest
 
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@87b7050dc53f08240a4e88c1e0f3c7bfe50ed871 # v4.0
+        with:
+          dotnet-version: 8.x
+
       - name: Create & publish macOS NuGet packages
         shell: pwsh
         run: |
@@ -479,7 +503,7 @@ jobs:
           $DistDir = "dist"
           $CommitHash = & git -C $Root rev-parse HEAD
           $RepoRemote = "https://github.com/microsoft/msquic.git"
-          $Version = "2.6.0-ci.$env:GITHUB_RUN_NUMBER"
+          $Version = "${{ github.event.inputs.msquic_version }}-ci.$env:GITHUB_RUN_NUMBER"
 
           New-Item -Path $DistDir -ItemType Directory -Force | Out-Null
 
@@ -569,13 +593,18 @@ jobs:
         with:
           nuget-version: latest
 
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@87b7050dc53f08240a4e88c1e0f3c7bfe50ed871 # v4.0
+        with:
+          dotnet-version: 8.x
+
       - name: Create & publish meta NuGet packages
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $CommitHash = & git -C src rev-parse HEAD
           $RepoRemote = "https://github.com/microsoft/msquic.git"
-          $Version = "2.6.0-ci.$env:GITHUB_RUN_NUMBER"
+          $Version = "${{ github.event.inputs.msquic_version }}-ci.$env:GITHUB_RUN_NUMBER"
           $DistDir = "dist"
           New-Item $DistDir -ItemType Directory -Force | Out-Null
 
