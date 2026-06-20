@@ -286,7 +286,7 @@ jobs:
               <title>MsQuic ($title)</title>
               <authors>Microsoft</authors>
               <license type="expression">MIT</license>
-$iconMeta
+          $iconMeta
               <projectUrl>https://github.com/microsoft/msquic</projectUrl>
               <requireLicenseAcceptance>true</requireLicenseAcceptance>
               <copyright>© Microsoft Corporation. All rights reserved.</copyright>
@@ -298,7 +298,7 @@ $iconMeta
               <file src="runtimes/**/*" target="runtimes/" />
               <file src="build/**/*" target="build/" />
               <file src="LICENSE" />
-$iconFile
+          $iconFile
             </files>
           </package>
           "@ | Set-Content "$p/MsQuicBuilds.Native.$title.nuspec" -Encoding UTF8
