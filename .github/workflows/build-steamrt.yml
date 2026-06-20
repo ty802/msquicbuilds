@@ -1,0 +1,53 @@
+name: build steamrt4
+
+on:
+  workflow_dispatch:
+
+jobs:
+  steamrt4:
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, aarch64]
+
+    runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/steamrt/steamrt4/steamrt4-amd64-sdk:latest
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: microsoft/msquic
+          submodules: false
+          fetch-depth: 0
+          path: src
+
+      - name: Init required submodules
+        run: git -C src submodule update --init --depth 1 submodules/quictls
+
+      - name: Install deps
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq wget curl cmake build-essential liblttng-ust-dev lttng-tools libssl-dev libnuma-dev
+          wget -q https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -O /tmp/msprod.deb
+          dpkg -i /tmp/msprod.deb 2>/dev/null || true
+          apt-get update -qq
+          apt-get install -y -qq powershell
+
+      - name: Install cross-compiler (aarch64 only)
+        if: matrix.arch == 'aarch64'
+        run: apt-get install -y -qq gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      - name: Build
+        shell: pwsh
+        working-directory: src
+        run: |
+          $arch = "${{ matrix.arch }}"
+          if ($arch -eq 'aarch64') { $arch = 'arm64' } else { $arch = 'x64' }
+          scripts/build.ps1 -Config Release -Platform linux -Arch $arch -Tls quictls -DisableTools -DisableTest -DisablePerf
+
+      - name: Upload raw artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: steamrt4-${{ matrix.arch }}
+          path: src/artifacts/
