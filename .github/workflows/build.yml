@@ -205,7 +205,7 @@ jobs:
           nuget-version: latest
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@87b7050dc53f08240a4e88c1e0f3c7bfe50ed871 # v4.0
+        uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
         with:
           dotnet-version: 8.x
 
@@ -372,7 +372,7 @@ jobs:
           nuget-version: latest
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@87b7050dc53f08240a4e88c1e0f3c7bfe50ed871 # v4.0
+        uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
         with:
           dotnet-version: 8.x
 
@@ -489,7 +489,7 @@ jobs:
           nuget-version: latest
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@87b7050dc53f08240a4e88c1e0f3c7bfe50ed871 # v4.0
+        uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
         with:
           dotnet-version: 8.x
 
@@ -594,7 +594,7 @@ jobs:
           nuget-version: latest
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@87b7050dc53f08240a4e88c1e0f3c7bfe50ed871 # v4.0
+        uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
         with:
           dotnet-version: 8.x
 
