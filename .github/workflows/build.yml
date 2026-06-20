@@ -264,7 +264,7 @@ jobs:
           <?xml version="1.0"?>
           <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
             <metadata>
-              <id>Native.Quic.MsQuic.$TlsLabel</id>
+              <id>MsQuicBuilds.Native.$TlsLabel</id>
               <version>$Version</version>
               <title>MsQuic ($TlsLabel)</title>
               <authors>Microsoft</authors>
@@ -278,7 +278,7 @@ jobs:
               <tags>native quic msquic $Tls</tags>
             </metadata>
           </package>
-          "@ | Set-Content "$PackagingDir/Native.Quic.MsQuic.$TlsLabel.nuspec" -Encoding UTF8
+          "@ | Set-Content "$PackagingDir/MsQuicBuilds.Native.$TlsLabel.nuspec" -Encoding UTF8
 
             # Build .targets
             $targetLines = @(
@@ -303,10 +303,10 @@ jobs:
             }
             $targetLines += '</Project>'
 
-            $targetLines -join "`n" | Set-Content "$PackagingDir/build/native/Native.Quic.MsQuic.$TlsLabel.targets" -Encoding UTF8
+            $targetLines -join "`n" | Set-Content "$PackagingDir/build/native/MsQuicBuilds.Native.$TlsLabel.targets" -Encoding UTF8
 
             # Pack
-            nuget pack "$PackagingDir/Native.Quic.MsQuic.$TlsLabel.nuspec" `
+            nuget pack "$PackagingDir/MsQuicBuilds.Native.$TlsLabel.nuspec" `
               -OutputDirectory $DistDir `
               -p CommitHash=$CommitHash `
               -p RepoRemote=$RepoRemote `
@@ -417,7 +417,7 @@ jobs:
           <?xml version="1.0"?>
           <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
             <metadata>
-              <id>Native.Quic.MsQuic.Linux</id>
+              <id>MsQuicBuilds.Native.Linux</id>
               <version>$Version</version>
               <title>MsQuic (Linux)</title>
               <authors>Microsoft</authors>
@@ -437,10 +437,10 @@ jobs:
               <file src="pkgicon.png" />
             </files>
           </package>
-          "@ | Set-Content "$PkgDir/Native.Quic.MsQuic.Linux.nuspec" -Encoding UTF8
+          "@ | Set-Content "$PkgDir/MsQuicBuilds.Native.Linux.nuspec" -Encoding UTF8
 
           # Pack
-          nuget pack "$PkgDir/Native.Quic.MsQuic.Linux.nuspec" `
+          nuget pack "$PkgDir/MsQuicBuilds.Native.Linux.nuspec" `
             -OutputDirectory $DistDir `
             -BasePath $PkgDir `
             -p CommitHash=$CommitHash `
@@ -536,7 +536,7 @@ jobs:
           <?xml version="1.0"?>
           <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
             <metadata>
-              <id>Native.Quic.MsQuic.macOS</id>
+              <id>MsQuicBuilds.Native.macOS</id>
               <version>$Version</version>
               <title>MsQuic (macOS)</title>
               <authors>Microsoft</authors>
@@ -556,9 +556,9 @@ jobs:
               <file src="pkgicon.png" />
             </files>
           </package>
-          "@ | Set-Content "$PkgDir/Native.Quic.MsQuic.macOS.nuspec" -Encoding UTF8
+          "@ | Set-Content "$PkgDir/MsQuicBuilds.Native.macOS.nuspec" -Encoding UTF8
 
-          nuget pack "$PkgDir/Native.Quic.MsQuic.macOS.nuspec" `
+          nuget pack "$PkgDir/MsQuicBuilds.Native.macOS.nuspec" `
             -OutputDirectory $DistDir `
             -BasePath $PkgDir `
             -p CommitHash=$CommitHash `
@@ -640,8 +640,8 @@ jobs:
               <dependencies>
                 <group targetFramework="native">
                   <dependency id="$WinDep" version="[$Version]" />
-                  <dependency id="Native.Quic.MsQuic.Linux" version="[$Version]" />
-                  <dependency id="Native.Quic.MsQuic.macOS" version="[$Version]" />
+                  <dependency id="MsQuicBuilds.Native.Linux" version="[$Version]" />
+                  <dependency id="MsQuicBuilds.Native.macOS" version="[$Version]" />
                 </group>
               </dependencies>
             </metadata>
@@ -654,11 +654,11 @@ jobs:
               -Version $Version
           }
 
-          New-MetaPackage "Native.Quic.MsQuic.AllPlatforms.Schannel" `
-            "Native.Quic.MsQuic.Schannel" "Schannel"
+          New-MetaPackage "MsQuicBuilds.Native.AllPlatforms.Schannel" `
+            "MsQuicBuilds.Native.Schannel" "Schannel"
 
-          New-MetaPackage "Native.Quic.MsQuic.AllPlatforms.QuicTls" `
-            "Native.Quic.MsQuic.Quictls" "QuicTls"
+          New-MetaPackage "MsQuicBuilds.Native.AllPlatforms.QuicTls" `
+            "MsQuicBuilds.Native.Quictls" "QuicTls"
 
           Write-Host "=== Meta NuGet packages ==="
           Get-ChildItem $DistDir
