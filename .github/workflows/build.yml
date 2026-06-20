@@ -329,25 +329,25 @@ jobs:
             $iconFile = if ($hasIcon) { "    <file src=`"pkgicon.png`" />" } else { "" }
 
             @"
-# MsQuic ($title)
+          # MsQuic ($title)
 
-This package provides native MsQuic binaries for **$rids**, using **$title** for TLS.
+          This package provides native MsQuic binaries for **$rids**, using **$title** for TLS.
 
-## Usage
+          ## Usage
 
-Add this package to a .NET 7+ project. The native library is automatically
-copied to the output directory at build time on Windows. On other platforms,
-NuGet's built-in RID resolution places the correct `runtimes/{rid}/native/`
-binary in the publish output.
+          Add this package to a .NET 7+ project. The native library is automatically
+          copied to the output directory at build time on Windows. On other platforms,
+          NuGet's built-in RID resolution places the correct `runtimes/{rid}/native/`
+          binary in the publish output.
 
-## Supported RIDs
+          ## Supported RIDs
 
-$ridList
+          $ridList
 
-## TLS Provider
+          ## TLS Provider
 
-$title
-"@ | Set-Content "$p/README.md" -Encoding UTF8
+          $title
+          "@ | Set-Content "$p/README.md" -Encoding UTF8
 
             @"
           <?xml version="1.0"?>
