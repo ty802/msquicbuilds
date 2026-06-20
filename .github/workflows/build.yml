@@ -362,9 +362,9 @@ jobs:
             @{rid="win-arm64"; os="windows"; a="arm64"; tls="schannel"}
           )
 
-          # Quictls: all platforms (regular Linux)
-          Write-Host "=== Packaging MsQuicBuilds.Native.Quictls ==="
-          New-MsQuicPkg -Tls quictls -Title "Quictls" -Platforms @(
+          # Openssl: all platforms (regular Linux)
+          Write-Host "=== Packaging MsQuicBuilds.Native.Openssl ==="
+          New-MsQuicPkg -Tls quictls -Title "Openssl" -Platforms @(
             @{rid="win-x64";        os="windows"; a="x64";   tls="quictls"},
             @{rid="win-arm64";      os="windows"; a="arm64"; tls="quictls"},
             @{rid="linux-x64";      os="linux";   a="x64";   tls="quictls"},
@@ -374,9 +374,9 @@ jobs:
             @{rid="android-arm64";  os="android"; a="arm64"; tls="quictls"}
           )
 
-          # Quictls.SteamRT: same platforms as Quictls but Linux compiled with SteamRT SDK
-          Write-Host "=== Packaging MsQuicBuilds.Native.Quictls.SteamRT ==="
-          New-MsQuicPkg -Tls quictls -Title "Quictls.SteamRT" -Platforms @(
+          # Openssl.SteamRT: same platforms as Openssl but Linux compiled with SteamRT SDK
+          Write-Host "=== Packaging MsQuicBuilds.Native.Openssl.SteamRT ==="
+          New-MsQuicPkg -Tls quictls -Title "Openssl.SteamRT" -Platforms @(
             @{rid="win-x64";        os="windows"; a="x64";   tls="quictls"},
             @{rid="win-arm64";      os="windows"; a="arm64"; tls="quictls"},
             @{rid="linux-x64";      os="linux";   a="x64";   tls="quictls"},
