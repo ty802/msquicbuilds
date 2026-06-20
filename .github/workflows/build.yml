@@ -175,10 +175,65 @@ jobs:
           path: src/artifacts/
 
   #############################################################################
+  # STEAMRT BUILDS (Linux x64 + arm64 via SteamRT SDK)
+  #############################################################################
+  steamrt:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: steamrt-amd64
+            arch: x64
+            container: registry.gitlab.steamos.cloud/steamrt/steamrt4/sdk:latest
+            onebranch: ''
+          - name: steamrt-arm64
+            arch: arm64
+            container: registry.gitlab.steamos.cloud/steamrt/steamrt4/sdk/arm64-on-amd64:latest
+            onebranch: '-OneBranch'
+
+    runs-on: ubuntu-22.04
+    container:
+      image: ${{ matrix.container }}
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: microsoft/msquic
+          submodules: false
+          fetch-depth: 0
+          path: src
+
+      - name: Init required submodules
+        run: git -C src submodule update --init --depth 1 submodules/quictls
+
+      - name: Install deps
+        run: |
+          set -e
+          apt-get update -qq
+          apt-get install -y -qq curl cmake build-essential
+          curl -fsSL https://github.com/PowerShell/PowerShell/releases/download/v7.4.7/powershell-7.4.7-linux-x64.tar.gz -o /tmp/pwsh.tar.gz
+          mkdir -p /opt/microsoft/powershell/7
+          tar -xzf /tmp/pwsh.tar.gz -C /opt/microsoft/powershell/7
+          chmod +x /opt/microsoft/powershell/7/pwsh
+          ln -sf /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh
+          /usr/local/bin/pwsh --version
+
+      - name: Build
+        shell: pwsh
+        working-directory: src
+        run: scripts/build.ps1 -Config Release -Platform linux -Arch ${{ matrix.arch }} -Tls quictls -DisableTools -DisableTest -DisablePerf ${{ matrix.onebranch }}
+
+      - name: Upload raw artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.name }}
+          path: src/artifacts/
+
+  #############################################################################
   # NUGET PACKAGING – produce all .nupkg in one job, push once
   #############################################################################
   nuget:
-    needs: [build, linux-arm64]
+    needs: [build, linux-arm64, steamrt]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -188,7 +243,32 @@ jobs:
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
+          pattern: windows-*
           path: src/artifacts
+          merge-multiple: true
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: linux-*
+          path: src/artifacts
+          merge-multiple: true
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: macos-*
+          path: src/artifacts
+          merge-multiple: true
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: android-*
+          path: src/artifacts
+          merge-multiple: true
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: steamrt-*
+          path: src/artifacts-steamrt
           merge-multiple: true
 
       - uses: nuget/setup-nuget@fd55a6f3b34392fa83fde1454582407d8c714123 # v4.0
@@ -214,9 +294,8 @@ jobs:
           New-Item $DistDir -ItemType Directory -Force | Out-Null
 
           function New-MsQuicPkg {
-            param([string]$Tls, [array]$Platforms)
-            $title = $Tls.Substring(0,1).ToUpper() + $Tls.Substring(1)
-            $Id = "MsQuicBuilds.Native.$title"
+            param([string]$Tls, [string]$Title, [array]$Platforms)
+            $Id = "MsQuicBuilds.Native.$Title"
             $p = "$ArtifactsDir/temp/nuget/$Id"
             Remove-Item $p -Recurse -Force -ErrorAction Ignore
             foreach ($plat in $Platforms) {
@@ -225,7 +304,8 @@ jobs:
             New-Item "$p/build/native/include" -Type Dir -Force | Out-Null
 
             foreach ($plat in $Platforms) {
-              $srcBin = "$ArtifactsDir/bin/$($plat.os)/$($plat.a)_Release_$($plat.tls)"
+              $root = if ($plat.ContainsKey('root')) { $plat.root } else { $ArtifactsDir }
+              $srcBin = "$root/bin/$($plat.os)/$($plat.a)_Release_$($plat.tls)"
               if ($plat.os -eq 'windows') {
                 Copy-Item "$srcBin/msquic.dll","$srcBin/msquic.pdb","$srcBin/msquic.lib" "$p/runtimes/$($plat.rid)/native/"
               } elseif ($plat.os -eq 'macos') {
@@ -300,18 +380,30 @@ jobs:
 
           # Schannel: Windows only (x64 + arm64)
           Write-Host "=== Packaging MsQuicBuilds.Native.Schannel ==="
-          New-MsQuicPkg -Tls schannel -Platforms @(
+          New-MsQuicPkg -Tls schannel -Title "Schannel" -Platforms @(
             @{rid="win-x64";   os="windows"; a="x64";   tls="schannel"},
             @{rid="win-arm64"; os="windows"; a="arm64"; tls="schannel"}
           )
 
-          # Quictls: all platforms
+          # Quictls: all platforms (regular Linux)
           Write-Host "=== Packaging MsQuicBuilds.Native.Quictls ==="
-          New-MsQuicPkg -Tls quictls -Platforms @(
+          New-MsQuicPkg -Tls quictls -Title "Quictls" -Platforms @(
             @{rid="win-x64";        os="windows"; a="x64";   tls="quictls"},
             @{rid="win-arm64";      os="windows"; a="arm64"; tls="quictls"},
             @{rid="linux-x64";      os="linux";   a="x64";   tls="quictls"},
             @{rid="linux-arm64";    os="linux";   a="arm64"; tls="quictls"},
+            @{rid="osx-x64";        os="macos";   a="x64";   tls="quictls"},
+            @{rid="osx-arm64";      os="macos";   a="arm64"; tls="quictls"},
+            @{rid="android-arm64";  os="android"; a="arm64"; tls="quictls"}
+          )
+
+          # Quictls.SteamRT: all platforms with SteamRT Linux
+          Write-Host "=== Packaging MsQuicBuilds.Native.Quictls.SteamRT ==="
+          New-MsQuicPkg -Tls quictls -Title "Quictls.SteamRT" -Platforms @(
+            @{rid="win-x64";        os="windows"; a="x64";   tls="quictls"},
+            @{rid="win-arm64";      os="windows"; a="arm64"; tls="quictls"},
+            @{rid="linux-x64";      os="linux";   a="x64";   tls="quictls"; root="$Root/artifacts-steamrt"},
+            @{rid="linux-arm64";    os="linux";   a="arm64"; tls="quictls"; root="$Root/artifacts-steamrt"},
             @{rid="osx-x64";        os="macos";   a="x64";   tls="quictls"},
             @{rid="osx-arm64";      os="macos";   a="arm64"; tls="quictls"},
             @{rid="android-arm64";  os="android"; a="arm64"; tls="quictls"}
@@ -344,7 +436,7 @@ jobs:
   #############################################################################
   complete:
     if: always()
-    needs: [build, linux-arm64, nuget]
+    needs: [build, linux-arm64, steamrt, nuget]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
