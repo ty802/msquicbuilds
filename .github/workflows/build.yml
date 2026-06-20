@@ -425,11 +425,120 @@ jobs:
           }
 
   #############################################################################
+  # NUGET PACKAGING (macOS – runtimes/ layout for x64 + arm64)
+  #############################################################################
+  nuget-macos:
+    needs: [build]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout msquic (headers + distribution metadata)
+        uses: actions/checkout@v4
+        with:
+          repository: microsoft/msquic
+          path: src
+
+      - name: Download macOS amd64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-amd64
+          path: src/artifacts
+
+      - name: Download macOS arm64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-arm64
+          path: src/artifacts
+
+      - name: Install NuGet CLI
+        shell: pwsh
+        run: dotnet tool install --global NuGet.CommandLine --version 6.*
+
+      - name: Create & publish macOS NuGet packages
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Root = "src"
+          $ArtifactsDir = "$Root/artifacts"
+          $PlatformDir = "$ArtifactsDir/bin/macos"
+          $DistDir = "dist"
+          $CommitHash = & git -C $Root rev-parse HEAD
+          $RepoRemote = "https://github.com/microsoft/msquic.git"
+          $Version = "2.6.0-ci.$env:GITHUB_RUN_NUMBER"
+
+          New-Item -Path $DistDir -ItemType Directory -Force | Out-Null
+
+          # ── combined package with runtimes/ layout ──────────────────────
+          $PkgDir = "tmp/macos"
+          Remove-Item $PkgDir -Recurse -Force -ErrorAction Ignore
+
+          foreach ($entry in @(@{arch="x64";rid="osx-x64"}, @{arch="arm64";rid="osx-arm64"})) {
+            $soDir = "$PkgDir/runtimes/$($entry.rid)/native"
+            New-Item -Path $soDir -ItemType Directory -Force | Out-Null
+            Copy-Item "$PlatformDir/$($entry.arch)_Release_quictls/libmsquic.dylib" "$soDir/"
+          }
+
+          # Headers
+          New-Item -Path "$PkgDir/build/native/include" -ItemType Directory -Force | Out-Null
+          foreach ($h in @("msquic.h", "msquicp.h", "msquic.hpp")) {
+            Copy-Item "$Root/src/inc/$h" "$PkgDir/build/native/include/"
+          }
+
+          Copy-Item "$Root/LICENSE" $PkgDir/
+          Copy-Item "$Root/src/distribution/pkgicon.png" $PkgDir
+
+          @"
+          <?xml version="1.0"?>
+          <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+            <metadata>
+              <id>Microsoft.Native.Quic.MsQuic.macOS</id>
+              <version>$Version</version>
+              <title>MsQuic (macOS)</title>
+              <authors>Microsoft</authors>
+              <license type="expression">MIT</license>
+              <icon>pkgicon.png</icon>
+              <projectUrl>https://github.com/microsoft/msquic</projectUrl>
+              <requireLicenseAcceptance>true</requireLicenseAcceptance>
+              <copyright>© Microsoft Corporation. All rights reserved.</copyright>
+              <description>MsQuic native library for osx-x64 and osx-arm64 using quictls for TLS</description>
+              <repository type="git" url="$RepoRemote" commit="$CommitHash" />
+              <tags>native quic msquic macos</tags>
+            </metadata>
+            <files>
+              <file src="runtimes/**/*" target="runtimes/" />
+              <file src="build/**/*" target="build/" />
+              <file src="LICENSE" target="" />
+              <file src="pkgicon.png" target="" />
+            </files>
+          </package>
+          "@ | Set-Content "$PkgDir/Microsoft.Native.Quic.MsQuic.macOS.nuspec" -Encoding UTF8
+
+          nuget pack "$PkgDir/Microsoft.Native.Quic.MsQuic.macOS.nuspec" `
+            -OutputDirectory $DistDir `
+            -BasePath $PkgDir `
+            -p CommitHash=$CommitHash `
+            -p RepoRemote=$RepoRemote `
+            -Version $Version
+
+          Write-Host "=== macOS NuGet packages ==="
+          Get-ChildItem $DistDir
+
+      - name: Push to GitHub NuGet registry
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          $source = "https://nuget.pkg.github.com/$env:GITHUB_REPOSITORY_OWNER/index.json"
+          Write-Host "Pushing to $source"
+          Get-ChildItem "dist/*.nupkg" | ForEach-Object {
+            Write-Host "  pushing $($_.Name)"
+            nuget push $_.FullName -Source $source -ApiKey $env:GITHUB_TOKEN -SkipDuplicate
+          }
+
+  #############################################################################
   # COMPLETE sentinel – validates every job passed
   #############################################################################
   complete:
     if: always()
-    needs: [build, linux-arm64, nuget-windows, nuget-linux]
+    needs: [build, linux-arm64, nuget-windows, nuget-linux, nuget-macos]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
