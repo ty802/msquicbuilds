@@ -324,8 +324,7 @@ jobs:
           Write-Host "Pushing packages to $source"
           Get-ChildItem "$dist/*.nupkg" | ForEach-Object {
             Write-Host "  pushing $($_.Name)"
-            nuget sources add -name "GitHub" -Source $source -Username oauth2 -Password $env:GITHUB_TOKEN -StorePasswordInClearText 2>$null | Out-Null
-            nuget push $_.FullName -Source "GitHub" -ApiKey $env:GITHUB_TOKEN -SkipDuplicate
+            dotnet nuget push $_.FullName --source $source --api-key $env:GITHUB_TOKEN --skip-duplicate
           }
 
   #############################################################################
@@ -412,8 +411,8 @@ jobs:
             <files>
               <file src="runtimes/**/*" target="runtimes/" />
               <file src="build/**/*" target="build/" />
-              <file src="LICENSE" target="" />
-              <file src="pkgicon.png" target="" />
+              <file src="LICENSE" />
+              <file src="pkgicon.png" />
             </files>
           </package>
           "@ | Set-Content "$PkgDir/Microsoft.Native.Quic.MsQuic.Linux.nuspec" -Encoding UTF8
@@ -437,8 +436,7 @@ jobs:
           Write-Host "Pushing to $source"
           Get-ChildItem "dist/*.nupkg" | ForEach-Object {
             Write-Host "  pushing $($_.Name)"
-            nuget sources add -name "GitHub" -Source $source -Username oauth2 -Password $env:GITHUB_TOKEN -StorePasswordInClearText 2>$null | Out-Null
-            nuget push $_.FullName -Source "GitHub" -ApiKey $env:GITHUB_TOKEN -SkipDuplicate
+            dotnet nuget push $_.FullName --source $source --api-key $env:GITHUB_TOKEN --skip-duplicate
           }
 
   #############################################################################
@@ -524,8 +522,8 @@ jobs:
             <files>
               <file src="runtimes/**/*" target="runtimes/" />
               <file src="build/**/*" target="build/" />
-              <file src="LICENSE" target="" />
-              <file src="pkgicon.png" target="" />
+              <file src="LICENSE" />
+              <file src="pkgicon.png" />
             </files>
           </package>
           "@ | Set-Content "$PkgDir/Microsoft.Native.Quic.MsQuic.macOS.nuspec" -Encoding UTF8
@@ -548,8 +546,7 @@ jobs:
           Write-Host "Pushing to $source"
           Get-ChildItem "dist/*.nupkg" | ForEach-Object {
             Write-Host "  pushing $($_.Name)"
-            nuget sources add -name "GitHub" -Source $source -Username oauth2 -Password $env:GITHUB_TOKEN -StorePasswordInClearText 2>$null | Out-Null
-            nuget push $_.FullName -Source "GitHub" -ApiKey $env:GITHUB_TOKEN -SkipDuplicate
+            dotnet nuget push $_.FullName --source $source --api-key $env:GITHUB_TOKEN --skip-duplicate
           }
 
   #############################################################################
@@ -634,8 +631,7 @@ jobs:
         run: |
           $source = "https://nuget.pkg.github.com/$env:GITHUB_REPOSITORY_OWNER/index.json"
           Get-ChildItem "dist/*.nupkg" | ForEach-Object {
-            nuget sources add -name "GitHub" -Source $source -Username oauth2 -Password $env:GITHUB_TOKEN -StorePasswordInClearText 2>$null | Out-Null
-            nuget push $_.FullName -Source "GitHub" -ApiKey $env:GITHUB_TOKEN -SkipDuplicate
+            dotnet nuget push $_.FullName --source $source --api-key $env:GITHUB_TOKEN --skip-duplicate
           }
 
   #############################################################################
