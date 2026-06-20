@@ -235,6 +235,9 @@ jobs:
   nuget:
     needs: [build, linux-arm64, steamrt]
     runs-on: ubuntu-22.04
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -392,6 +395,12 @@ jobs:
           name: nuget-packages
           path: dist/
 
+      - name: NuGet login (OIDC → temp API key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
       - name: Push to NuGet.org
         if: github.event_name != 'pull_request'
         shell: pwsh
@@ -400,7 +409,7 @@ jobs:
           Write-Host "Pushing to $source"
           Get-ChildItem "dist/*.nupkg" | ForEach-Object {
             Write-Host "  pushing $($_.Name)"
-            dotnet nuget push $_.FullName --source $source --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
+            dotnet nuget push $_.FullName --source $source --api-key ${{steps.login.outputs.NUGET_API_KEY}} --skip-duplicate
           }
 
   #############################################################################
