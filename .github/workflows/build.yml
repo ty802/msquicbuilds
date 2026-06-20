@@ -324,7 +324,8 @@ jobs:
           Write-Host "Pushing packages to $source"
           Get-ChildItem "$dist/*.nupkg" | ForEach-Object {
             Write-Host "  pushing $($_.Name)"
-            nuget push $_.FullName -Source $source -ApiKey $env:GITHUB_TOKEN -SkipDuplicate
+            nuget sources add -name "GitHub" -Source $source -Username oauth2 -Password $env:GITHUB_TOKEN -StorePasswordInClearText 2>$null | Out-Null
+            nuget push $_.FullName -Source "GitHub" -ApiKey $env:GITHUB_TOKEN -SkipDuplicate
           }
 
   #############################################################################
@@ -436,7 +437,8 @@ jobs:
           Write-Host "Pushing to $source"
           Get-ChildItem "dist/*.nupkg" | ForEach-Object {
             Write-Host "  pushing $($_.Name)"
-            nuget push $_.FullName -Source $source -ApiKey $env:GITHUB_TOKEN -SkipDuplicate
+            nuget sources add -name "GitHub" -Source $source -Username oauth2 -Password $env:GITHUB_TOKEN -StorePasswordInClearText 2>$null | Out-Null
+            nuget push $_.FullName -Source "GitHub" -ApiKey $env:GITHUB_TOKEN -SkipDuplicate
           }
 
   #############################################################################
@@ -546,7 +548,8 @@ jobs:
           Write-Host "Pushing to $source"
           Get-ChildItem "dist/*.nupkg" | ForEach-Object {
             Write-Host "  pushing $($_.Name)"
-            nuget push $_.FullName -Source $source -ApiKey $env:GITHUB_TOKEN -SkipDuplicate
+            nuget sources add -name "GitHub" -Source $source -Username oauth2 -Password $env:GITHUB_TOKEN -StorePasswordInClearText 2>$null | Out-Null
+            nuget push $_.FullName -Source "GitHub" -ApiKey $env:GITHUB_TOKEN -SkipDuplicate
           }
 
   #############################################################################
@@ -631,7 +634,8 @@ jobs:
         run: |
           $source = "https://nuget.pkg.github.com/$env:GITHUB_REPOSITORY_OWNER/index.json"
           Get-ChildItem "dist/*.nupkg" | ForEach-Object {
-            nuget push $_.FullName -Source $source -ApiKey $env:GITHUB_TOKEN -SkipDuplicate
+            nuget sources add -name "GitHub" -Source $source -Username oauth2 -Password $env:GITHUB_TOKEN -StorePasswordInClearText 2>$null | Out-Null
+            nuget push $_.FullName -Source "GitHub" -ApiKey $env:GITHUB_TOKEN -SkipDuplicate
           }
 
   #############################################################################
