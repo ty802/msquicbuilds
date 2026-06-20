@@ -324,8 +324,31 @@ jobs:
             $tl -join "`n" | Set-Content "$p/build/native/$Id.targets" -Encoding UTF8
 
             $rids = ($Platforms | ForEach-Object { $_.rid }) -join ', '
+            $ridList = ($Platforms | ForEach-Object { "- $($_.rid)" }) -join "`n"
             $iconMeta = if ($hasIcon) { "    <icon>pkgicon.png</icon>" } else { "" }
             $iconFile = if ($hasIcon) { "    <file src=`"pkgicon.png`" />" } else { "" }
+
+            @"
+# MsQuic ($title)
+
+This package provides native MsQuic binaries for **$rids**, using **$title** for TLS.
+
+## Usage
+
+Add this package to a .NET 7+ project. The native library is automatically
+copied to the output directory at build time on Windows. On other platforms,
+NuGet's built-in RID resolution places the correct `runtimes/{rid}/native/`
+binary in the publish output.
+
+## Supported RIDs
+
+$ridList
+
+## TLS Provider
+
+$title
+"@ | Set-Content "$p/README.md" -Encoding UTF8
+
             @"
           <?xml version="1.0"?>
           <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
@@ -340,12 +363,14 @@ jobs:
               <requireLicenseAcceptance>true</requireLicenseAcceptance>
               <copyright>© Microsoft Corporation. All rights reserved.</copyright>
               <description>MsQuic native library for $rids using $title for TLS</description>
+              <readme>README.md</readme>
               <repository type="git" url="$RepoRemote" commit="$CommitHash" />
               <tags>native quic msquic $Tls</tags>
             </metadata>
             <files>
               <file src="runtimes/**/*" target="runtimes/" />
               <file src="build/**/*" target="build/" />
+              <file src="README.md" />
               <file src="LICENSE" />
           $iconFile
             </files>
