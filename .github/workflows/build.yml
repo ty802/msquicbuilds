@@ -328,7 +328,32 @@ jobs:
             $iconMeta = if ($hasIcon) { "    <icon>pkgicon.png</icon>" } else { "" }
             $iconFile = if ($hasIcon) { "    <file src=`"pkgicon.png`" />" } else { "" }
 
-            @"
+            if ($Title -like '*SteamRT*') {
+              $readme = @"
+          # MsQuic ($title)
+
+          This package provides native MsQuic binaries for **$rids**, built and linked
+          against SteamRT libraries. It is not specific to any TLS provider — the
+          `openssl` TLS is used incidentally; the key distinction is the SteamRT
+          SDK toolchain and runtime linkage.
+
+          ## Usage
+
+          Add this package to a .NET 7+ project. The native library is automatically
+          copied to the output directory at build time on Windows. On other platforms,
+          NuGet's built-in RID resolution places the correct `runtimes/{rid}/native/`
+          binary in the publish output.
+
+          ## Supported RIDs
+
+          $ridList
+
+          ## Build Environment
+
+          Steam Runtime 4 SDK
+          "@
+            } else {
+              $readme = @"
           # MsQuic ($title)
 
           This package provides native MsQuic binaries for **$rids**, using **$title** for TLS.
@@ -347,7 +372,9 @@ jobs:
           ## TLS Provider
 
           $title
-          "@ | Set-Content "$p/README.md" -Encoding UTF8
+          "@
+            }
+            $readme | Set-Content "$p/README.md" -Encoding UTF8
 
             @"
           <?xml version="1.0"?>
