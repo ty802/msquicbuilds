@@ -10,9 +10,10 @@ Builds [microsoft/msquic](https://github.com/microsoft/msquic) via GitHub Action
 | macOS       | amd64, arm64       | quictls               |
 | Android     | arm64              | quictls               |
 
-NuGet packages produced for Windows:
-- `Microsoft.Native.Quic.MsQuic.Schannel` – x64 + arm64
-- `Microsoft.Native.Quic.MsQuic.QuicTls` – x64 (works on older Windows)
+NuGet packages produced:
+- `Microsoft.Native.Quic.MsQuic.Schannel` – Windows x64 + arm64
+- `Microsoft.Native.Quic.MsQuic.QuicTls` – Windows x64 (older Windows)
+- `Microsoft.Native.Quic.MsQuic.Linux` – Linux x64 + arm64
 
 ## Artifacts
 
