@@ -29,10 +29,10 @@ jobs:
         run: |
           apt-get update -qq
           apt-get install -y -qq wget curl cmake build-essential liblttng-ust-dev lttng-tools libssl-dev libnuma-dev
-          wget -q https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -O /tmp/msprod.deb
-          dpkg -i /tmp/msprod.deb 2>/dev/null || true
-          apt-get update -qq
-          apt-get install -y -qq powershell
+          wget -q https://github.com/PowerShell/PowerShell/releases/download/v7.4.7/powershell-7.4.7-linux-x64.tar.gz -O /tmp/pwsh.tar.gz
+          mkdir -p /opt/microsoft/powershell/7
+          tar -xzf /tmp/pwsh.tar.gz -C /opt/microsoft/powershell/7
+          ln -sf /opt/microsoft/powershell/7/pwsh /usr/bin/pwsh
 
       - name: Install cross-compiler (aarch64 only)
         if: matrix.arch == 'aarch64'
