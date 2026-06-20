@@ -39,8 +39,9 @@ jobs:
           curl -fsSL https://github.com/PowerShell/PowerShell/releases/download/v7.4.7/powershell-7.4.7-linux-x64.tar.gz -o /tmp/pwsh.tar.gz
           mkdir -p /opt/microsoft/powershell/7
           tar -xzf /tmp/pwsh.tar.gz -C /opt/microsoft/powershell/7
+          chmod +x /opt/microsoft/powershell/7/pwsh
           ln -sf /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh
-          pwsh --version
+          /usr/local/bin/pwsh --version
 
       - name: Build
         shell: pwsh
