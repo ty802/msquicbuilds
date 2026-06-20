@@ -13,6 +13,7 @@ concurrency:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   #############################################################################
@@ -105,8 +106,11 @@ jobs:
         shell: pwsh
         working-directory: src
         run: |
-          $gen = if ($env:RUNNER_OS -eq 'Windows') { '-Generator "Visual Studio 17 2022"' } else { '' }
-          scripts/build.ps1 -Config Release -Platform ${{ matrix.platform }} -Arch ${{ matrix.arch }} -Tls ${{ matrix.tls }} -DisableTools -DisableTest -DisablePerf $gen
+          if ($env:RUNNER_OS -eq 'Windows') {
+            scripts/build.ps1 -Config Release -Platform ${{ matrix.platform }} -Arch ${{ matrix.arch }} -Tls ${{ matrix.tls }} -DisableTools -DisableTest -DisablePerf -Generator "Visual Studio 17 2022"
+          } else {
+            scripts/build.ps1 -Config Release -Platform ${{ matrix.platform }} -Arch ${{ matrix.arch }} -Tls ${{ matrix.tls }} -DisableTools -DisableTest -DisablePerf
+          }
 
       - name: Upload raw artifacts
         uses: actions/upload-artifact@v4
@@ -295,6 +299,19 @@ jobs:
         with:
           name: nuget-windows
           path: src/artifacts/dist/*.nupkg
+
+      - name: Push to GitHub NuGet registry
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        working-directory: src
+        run: |
+          $source = "https://nuget.pkg.github.com/$env:GITHUB_REPOSITORY_OWNER/index.json"
+          $dist = "artifacts/dist"
+          Write-Host "Pushing packages to $source"
+          Get-ChildItem "$dist/*.nupkg" | ForEach-Object {
+            Write-Host "  pushing $($_.Name)"
+            nuget push $_.FullName -Source $source -ApiKey $env:GITHUB_TOKEN -SkipDuplicate
+          }
 
   #############################################################################
   # COMPLETE sentinel – validates every job passed
