@@ -178,7 +178,7 @@ jobs:
   # NUGET PACKAGING – produce all .nupkg in one job, push once
   #############################################################################
   nuget:
-    needs: [build]
+    needs: [build, linux-arm64]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -188,23 +188,8 @@ jobs:
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: windows-amd64
           path: src/artifacts
-
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: windows-arm64
-          path: src/artifacts
-
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: windows-amd64-quictls
-          path: src/artifacts
-
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: windows-arm64-quictls
-          path: src/artifacts
+          merge-multiple: true
 
       - uses: nuget/setup-nuget@fd55a6f3b34392fa83fde1454582407d8c714123 # v4.0
         with:
@@ -229,18 +214,25 @@ jobs:
           New-Item $DistDir -ItemType Directory -Force | Out-Null
 
           function New-MsQuicPkg {
-            param([string]$Tls, [array]$WinArchs)
+            param([string]$Tls, [array]$Platforms)
             $title = $Tls.Substring(0,1).ToUpper() + $Tls.Substring(1)
-            $p = "$ArtifactsDir/temp/nuget/$title"
+            $Id = "MsQuicBuilds.Native.$title"
+            $p = "$ArtifactsDir/temp/nuget/$Id"
             Remove-Item $p -Recurse -Force -ErrorAction Ignore
-            foreach ($a in $WinArchs) {
-              New-Item "$p/runtimes/win-$a/native" -Type Dir -Force | Out-Null
+            foreach ($plat in $Platforms) {
+              New-Item "$p/runtimes/$($plat.rid)/native" -Type Dir -Force | Out-Null
             }
             New-Item "$p/build/native/include" -Type Dir -Force | Out-Null
 
-            foreach ($a in $WinArchs) {
-              $srcBin = "$ArtifactsDir/bin/windows/${a}_Release_${Tls}"
-              Copy-Item "$srcBin/msquic.dll","$srcBin/msquic.pdb","$srcBin/msquic.lib" "$p/runtimes/win-$a/native/"
+            foreach ($plat in $Platforms) {
+              $srcBin = "$ArtifactsDir/bin/$($plat.os)/$($plat.a)_Release_$($plat.tls)"
+              if ($plat.os -eq 'windows') {
+                Copy-Item "$srcBin/msquic.dll","$srcBin/msquic.pdb","$srcBin/msquic.lib" "$p/runtimes/$($plat.rid)/native/"
+              } elseif ($plat.os -eq 'macos') {
+                Copy-Item "$srcBin/libmsquic.dylib" "$p/runtimes/$($plat.rid)/native/"
+              } else {
+                Copy-Item "$srcBin/libmsquic.so" "$p/runtimes/$($plat.rid)/native/"
+              }
             }
 
             foreach ($h in @("msquic.h","msquicp.h","msquic.hpp","msquic_winuser.h")) {
@@ -259,29 +251,29 @@ jobs:
               '      <AdditionalIncludeDirectories>`$(MSBuildThisFileDirectory)include/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>',
               '    </ClCompile>'
             )
-            foreach ($a in $WinArchs) {
-              $tl += "    <Link Condition=""'`$(Platform.ToLower())' == '$a'"">"
-              $tl += "      <AdditionalDependencies>`$(MSBuildThisFileDirectory)../../runtimes/win-$a/native/msquic.lib;%(AdditionalDependencies)</AdditionalDependencies>"
+            foreach ($plat in $Platforms | Where-Object { $_.os -eq 'windows' }) {
+              $tl += "    <Link Condition=""'`$(Platform.ToLower())' == '$($plat.a)'"">"
+              $tl += "      <AdditionalDependencies>`$(MSBuildThisFileDirectory)../../runtimes/$($plat.rid)/native/msquic.lib;%(AdditionalDependencies)</AdditionalDependencies>"
               $tl += "    </Link>"
             }
             $tl += '  </ItemDefinitionGroup>'
             $tl += '  <Target Name="msquic_AfterBuild" AfterTargets="AfterBuild" />'
-            foreach ($a in $WinArchs) {
-              $tl += "  <Target Name=""msquic_AfterBuild_$a"" Label=""$a"" Condition=""'`$(RuntimeIdentifier)' == 'win-$a' Or '`$(Platform.ToLower())' == '$a'"" AfterTargets=""msquic_AfterBuild"">"
-              $tl += "    <Copy SourceFiles=""`$(MSBuildThisFileDirectory)../../runtimes/win-$a/native/msquic.dll"" DestinationFolder=""`$(TargetDir)"" SkipUnchangedFiles=""true"" />"
+            foreach ($plat in $Platforms | Where-Object { $_.os -eq 'windows' }) {
+              $tl += "  <Target Name=""msquic_AfterBuild_$($plat.a)"" Label=""$($plat.a)"" Condition=""'`$(RuntimeIdentifier)' == '$($plat.rid)' Or '`$(Platform.ToLower())' == '$($plat.a)'"" AfterTargets=""msquic_AfterBuild"">"
+              $tl += "    <Copy SourceFiles=""`$(MSBuildThisFileDirectory)../../runtimes/$($plat.rid)/native/msquic.dll"" DestinationFolder=""`$(TargetDir)"" SkipUnchangedFiles=""true"" />"
               $tl += "  </Target>"
             }
             $tl += '</Project>'
-            $tl -join "`n" | Set-Content "$p/build/native/MsQuicBuilds.Native.$title.targets" -Encoding UTF8
+            $tl -join "`n" | Set-Content "$p/build/native/$Id.targets" -Encoding UTF8
 
-            $rids = ($WinArchs | ForEach-Object { "win-$_" }) -join ', '
+            $rids = ($Platforms | ForEach-Object { $_.rid }) -join ', '
             $iconMeta = if ($hasIcon) { "    <icon>pkgicon.png</icon>" } else { "" }
             $iconFile = if ($hasIcon) { "    <file src=`"pkgicon.png`" />" } else { "" }
             @"
           <?xml version="1.0"?>
           <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
             <metadata>
-              <id>MsQuicBuilds.Native.$title</id>
+              <id>$Id</id>
               <version>$Version</version>
               <title>MsQuic ($title)</title>
               <authors>Microsoft</authors>
@@ -301,16 +293,29 @@ jobs:
           $iconFile
             </files>
           </package>
-          "@ | Set-Content "$p/MsQuicBuilds.Native.$title.nuspec" -Encoding UTF8
+          "@ | Set-Content "$p/$Id.nuspec" -Encoding UTF8
 
-            nuget pack "$p/MsQuicBuilds.Native.$title.nuspec" -OutputDirectory $DistDir -BasePath $p -Version $Version
+            nuget pack "$p/$Id.nuspec" -OutputDirectory $DistDir -BasePath $p -Version $Version
           }
 
+          # Schannel: Windows only (x64 + arm64)
           Write-Host "=== Packaging MsQuicBuilds.Native.Schannel ==="
-          New-MsQuicPkg -Tls schannel -WinArchs @("x64","arm64")
+          New-MsQuicPkg -Tls schannel -Platforms @(
+            @{rid="win-x64";   os="windows"; a="x64";   tls="schannel"},
+            @{rid="win-arm64"; os="windows"; a="arm64"; tls="schannel"}
+          )
 
+          # Quictls: all platforms
           Write-Host "=== Packaging MsQuicBuilds.Native.Quictls ==="
-          New-MsQuicPkg -Tls quictls -WinArchs @("x64","arm64")
+          New-MsQuicPkg -Tls quictls -Platforms @(
+            @{rid="win-x64";        os="windows"; a="x64";   tls="quictls"},
+            @{rid="win-arm64";      os="windows"; a="arm64"; tls="quictls"},
+            @{rid="linux-x64";      os="linux";   a="x64";   tls="quictls"},
+            @{rid="linux-arm64";    os="linux";   a="arm64"; tls="quictls"},
+            @{rid="osx-x64";        os="macos";   a="x64";   tls="quictls"},
+            @{rid="osx-arm64";      os="macos";   a="arm64"; tls="quictls"},
+            @{rid="android-arm64";  os="android"; a="arm64"; tls="quictls"}
+          )
 
           Write-Host "=== All NuGet packages ==="
           Get-ChildItem $DistDir
