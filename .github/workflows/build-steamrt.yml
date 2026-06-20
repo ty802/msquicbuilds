@@ -8,11 +8,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, aarch64]
+        include:
+          - arch: amd64
+            container: registry.gitlab.steamos.cloud/steamrt/steamrt4/sdk:latest
+            msquic_arch: x64
+          - arch: aarch64
+            container: registry.gitlab.steamos.cloud/steamrt/steamrt4/sdk/arm64-on-amd64:latest
+            msquic_arch: arm64
 
     runs-on: ubuntu-22.04
     container:
-      image: registry.gitlab.steamos.cloud/steamrt/steamrt4/sdk:latest
+      image: ${{ matrix.container }}
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -29,46 +35,33 @@ jobs:
         run: |
           set -e
           apt-get update -qq
-          apt-get install -y -qq curl cmake build-essential liblttng-ust-dev lttng-tools libssl-dev libnuma-dev
+          apt-get install -y -qq curl cmake build-essential
           curl -fsSL https://github.com/PowerShell/PowerShell/releases/download/v7.4.7/powershell-7.4.7-linux-x64.tar.gz -o /tmp/pwsh.tar.gz
           mkdir -p /opt/microsoft/powershell/7
           tar -xzf /tmp/pwsh.tar.gz -C /opt/microsoft/powershell/7
           ln -sf /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh
           pwsh --version
 
-      - name: Install cross-compiler (aarch64 only)
-        if: matrix.arch == 'aarch64'
-        run: |
-          dpkg --add-architecture arm64
-          apt-get update -qq
-          apt-get install -y -qq gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
-            liblttng-ust-dev:arm64 libssl-dev:arm64 libnuma-dev:arm64
-
       - name: Build
         shell: pwsh
         working-directory: src
-        run: |
-          $arch = "${{ matrix.arch }}"
-          if ($arch -eq 'aarch64') { $arch = 'arm64' } else { $arch = 'x64' }
-          scripts/build.ps1 -Config Release -Platform linux -Arch $arch -Tls quictls -DisableTools -DisableTest -DisablePerf
+        run: scripts/build.ps1 -Config Release -Platform linux -Arch ${{ matrix.msquic_arch }} -Tls quictls -DisableTools -DisableTest -DisablePerf
 
       - name: Package
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $arch = "${{ matrix.arch }}"
-          if ($arch -eq 'aarch64') { $a = 'arm64' } else { $a = 'x64' }
           $root = Resolve-Path "."
           $staging = "$root/staging"
           $libdir = "$staging/lib"
           $incdir = "$staging/include"
           $pkgdir = "$root/pkg"
           New-Item $libdir,$incdir,$pkgdir -ItemType Directory -Force | Out-Null
-          Copy-Item "$root/src/artifacts/bin/linux/${a}_Release_quictls/libmsquic.so*" $libdir/
+          Copy-Item "$root/src/artifacts/bin/linux/${{ matrix.msquic_arch }}_Release_quictls/libmsquic.so*" $libdir/
           Copy-Item "$root/src/src/inc/msquic.h","$root/src/src/inc/msquicp.h","$root/src/src/inc/msquic.hpp" $incdir/
           Copy-Item "$root/src/LICENSE" $staging/
-          tar -czf "$pkgdir/msquic-steamrt4-$arch.tar.gz" -C $staging .
-          echo "Packaged msquic-steamrt4-$arch.tar.gz"
+          tar -czf "$pkgdir/msquic-steamrt4-${{ matrix.arch }}.tar.gz" -C $staging .
+          echo "Packaged msquic-steamrt4-${{ matrix.arch }}.tar.gz"
 
       - name: Upload packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
