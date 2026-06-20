@@ -320,14 +320,11 @@ jobs:
           Write-Host "=== All NuGet packages ==="
           Get-ChildItem $DistDir
 
-      - name: Create uncompressed archive for upload
-        run: tar -cf nuget-packages.tar -C dist .
-
-      - name: Upload NuGet packages (uncompressed)
+      - name: Upload NuGet packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          archive: false
-          path: nuget-packages.tar
+          name: nuget-packages
+          path: dist/
 
       - name: Push to GitHub NuGet registry
         if: github.event_name != 'pull_request'
