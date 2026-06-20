@@ -96,10 +96,17 @@ jobs:
         if: runner.os == 'Windows' && matrix.tls != 'schannel'
         uses: ilammy/setup-nasm@v1
 
+      - name: Install Perl (Windows quictls — needed by OpenSSL build)
+        if: runner.os == 'Windows' && matrix.tls != 'schannel'
+        shell: pwsh
+        run: choco install strawberryperl -y --no-progress --limit-output
+
       - name: Build
         shell: pwsh
         working-directory: src
-        run: scripts/build.ps1 -Config Release -Platform ${{ matrix.platform }} -Arch ${{ matrix.arch }} -Tls ${{ matrix.tls }}
+        run: |
+          $gen = if ($env:RUNNER_OS -eq 'Windows') { '-Generator "Visual Studio 17 2022"' } else { '' }
+          scripts/build.ps1 -Config Release -Platform ${{ matrix.platform }} -Arch ${{ matrix.arch }} -Tls ${{ matrix.tls }} $gen
 
       - name: Upload raw artifacts
         uses: actions/upload-artifact@v4
