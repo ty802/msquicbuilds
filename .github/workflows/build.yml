@@ -270,7 +270,7 @@ jobs:
 
           function New-MsQuicPkg {
             param([string]$Tls, [string]$Title, [array]$Platforms)
-            $Id = "MsQuicBuilds.Native.$Title"
+            $Id = "Ty802.MsQuicBuilds.Native.$Title"
             $p = "$ArtifactsDir/temp/nuget/$Id"
             Remove-Item $p -Recurse -Force -ErrorAction Ignore
             foreach ($plat in $Platforms) {
@@ -392,17 +392,15 @@ jobs:
           name: nuget-packages
           path: dist/
 
-      - name: Push to GitHub NuGet registry
+      - name: Push to NuGet.org
         if: github.event_name != 'pull_request'
         shell: pwsh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $source = "https://nuget.pkg.github.com/$env:GITHUB_REPOSITORY_OWNER/index.json"
+          $source = "https://api.nuget.org/v3/index.json"
           Write-Host "Pushing to $source"
           Get-ChildItem "dist/*.nupkg" | ForEach-Object {
             Write-Host "  pushing $($_.Name)"
-            dotnet nuget push $_.FullName --source $source --api-key $env:GITHUB_TOKEN --skip-duplicate
+            dotnet nuget push $_.FullName --source $source --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
           }
 
   #############################################################################
