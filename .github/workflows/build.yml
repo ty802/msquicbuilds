@@ -255,7 +255,7 @@ jobs:
             }
             Copy-Item "$Root/LICENSE","$Root/src/distribution/pkgicon.png" $p
             $L = "$($Tls.Substring(0,1).ToUpper())$($Tls.Substring(1))"
-@"
+            @"
           <?xml version="1.0"?>
           <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
             <metadata>
@@ -273,7 +273,7 @@ jobs:
               <tags>native quic msquic $Tls</tags>
             </metadata>
           </package>
-"@ | Set-Content "$p/MsQuicBuilds.Native.$L.nuspec" -Encoding UTF8
+          "@ | Set-Content "$p/MsQuicBuilds.Native.$L.nuspec" -Encoding UTF8
 
             $tl = @(
               '<?xml version="1.0" encoding="utf-8"?>',
@@ -317,7 +317,7 @@ jobs:
             Copy-Item "$Root/src/inc/$h" "$nixPkg/build/native/include/"
           }
           Copy-Item "$Root/LICENSE","$Root/src/distribution/pkgicon.png" $nixPkg
-@"
+          @"
           <?xml version="1.0"?>
           <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
             <metadata>
@@ -341,7 +341,7 @@ jobs:
               <file src="pkgicon.png" />
             </files>
           </package>
-"@ | Set-Content "$nixPkg/MsQuicBuilds.Native.Linux.nuspec" -Encoding UTF8
+          "@ | Set-Content "$nixPkg/MsQuicBuilds.Native.Linux.nuspec" -Encoding UTF8
           nuget pack "$nixPkg/MsQuicBuilds.Native.Linux.nuspec" -OutputDirectory $DistDir -BasePath $nixPkg -p CommitHash=$CommitHash -p RepoRemote=$RepoRemote -Version $Version
 
           # ── macOS (runtimes/ layout, osx-x64 + osx-arm64) ───────────────
@@ -357,7 +357,7 @@ jobs:
             Copy-Item "$Root/src/inc/$h" "$macPkg/build/native/include/"
           }
           Copy-Item "$Root/LICENSE","$Root/src/distribution/pkgicon.png" $macPkg
-@"
+          @"
           <?xml version="1.0"?>
           <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
             <metadata>
@@ -381,7 +381,7 @@ jobs:
               <file src="pkgicon.png" />
             </files>
           </package>
-"@ | Set-Content "$macPkg/MsQuicBuilds.Native.macOS.nuspec" -Encoding UTF8
+          "@ | Set-Content "$macPkg/MsQuicBuilds.Native.macOS.nuspec" -Encoding UTF8
           nuget pack "$macPkg/MsQuicBuilds.Native.macOS.nuspec" -OutputDirectory $DistDir -BasePath $macPkg -p CommitHash=$CommitHash -p RepoRemote=$RepoRemote -Version $Version
 
           # ── Meta packages (aggregate all platforms) ─────────────────────
@@ -390,7 +390,7 @@ jobs:
             $d = "$ArtifactsDir/temp/meta/$Id"
             Remove-Item $d -Recurse -Force -ErrorAction Ignore
             New-Item $d -Type Dir -Force | Out-Null
-@"
+            @"
           <?xml version="1.0"?>
           <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
             <metadata>
@@ -415,7 +415,7 @@ jobs:
               </dependencies>
             </metadata>
           </package>
-"@ | Set-Content "$d/$Id.nuspec" -Encoding UTF8
+          "@ | Set-Content "$d/$Id.nuspec" -Encoding UTF8
             nuget pack "$d/$Id.nuspec" -OutputDirectory $DistDir -BasePath $d -Version $Version
           }
           New-MetaPkg "MsQuicBuilds.Native.AllPlatforms.Schannel" "MsQuicBuilds.Native.Schannel" "Schannel"
