@@ -72,9 +72,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: microsoft/msquic
-          submodules: recursive
+          submodules: false
           fetch-depth: 0
           path: src
+
+      - name: Init required submodules
+        shell: pwsh
+        run: |
+          $submodules = @()
+          if ("${{ matrix.platform }}" -eq "windows") { $submodules += "submodules/xdp-for-windows" }
+          if ("${{ matrix.tls }}" -ne "schannel")   { $submodules += "submodules/quictls" }
+          if ($submodules.Count -gt 0) {
+            git -C src submodule update --init --depth 1 $submodules
+          }
 
       - name: Install deps (Linux native)
         if: runner.os == 'Linux' && matrix.platform == 'linux'
@@ -130,9 +140,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: microsoft/msquic
-          submodules: recursive
+          submodules: false
           fetch-depth: 0
           path: src
+
+      - name: Init required submodules (quictls)
+        shell: bash
+        run: git -C src submodule update --init --depth 1 submodules/quictls
 
       - name: Fix git ownership
         run: chown -R $(id -u):$(id -g) src/
