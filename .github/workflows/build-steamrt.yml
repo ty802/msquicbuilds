@@ -29,7 +29,7 @@ jobs:
           path: src
 
       - name: Init required submodules
-        run: git -C src submodule update --init --depth 1 submodules/quictls
+        run: git -C src submodule update --init --depth 1 submodules/openssl
 
       - name: Install deps
         run: |
@@ -46,7 +46,7 @@ jobs:
       - name: Build
         shell: pwsh
         working-directory: src
-        run: scripts/build.ps1 -Config Release -Platform linux -Arch ${{ matrix.msquic_arch }} -Tls quictls -DisableTools -DisableTest -DisablePerf ${{ matrix.msquic_arch == 'arm64' && '-OneBranch' || '' }}
+        run: scripts/build.ps1 -Config Release -Platform linux -Arch ${{ matrix.msquic_arch }} -Tls openssl -DisableTools -DisableTest -DisablePerf ${{ matrix.msquic_arch == 'arm64' && '-OneBranch' || '' }}
 
       - name: Package
         shell: pwsh
@@ -58,7 +58,7 @@ jobs:
           $incdir = "$staging/include"
           $pkgdir = "$root/pkg"
           New-Item $libdir,$incdir,$pkgdir -ItemType Directory -Force | Out-Null
-          Copy-Item "$root/src/artifacts/bin/linux/${{ matrix.msquic_arch }}_Release_quictls/libmsquic.so*" $libdir/
+          Copy-Item "$root/src/artifacts/bin/linux/${{ matrix.msquic_arch }}_Release_openssl/libmsquic.so*" $libdir/
           Copy-Item "$root/src/src/inc/msquic.h","$root/src/src/inc/msquicp.h","$root/src/src/inc/msquic.hpp" $incdir/
           Copy-Item "$root/src/LICENSE" $staging/
           tar -czf "$pkgdir/msquic-steamrt4-${{ matrix.arch }}.tar.gz" -C $staging .

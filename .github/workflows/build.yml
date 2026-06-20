@@ -41,41 +41,41 @@ jobs:
             arch: arm64
             tls: schannel
 
-          - name: windows-amd64-quictls
+          - name: windows-amd64-openssl
             os: windows-2022
             platform: windows
             arch: x64
-            tls: quictls
+            tls: openssl
 
-          - name: windows-arm64-quictls
+          - name: windows-arm64-openssl
             os: windows-2022
             platform: windows
             arch: arm64
-            tls: quictls
+            tls: openssl
 
           - name: linux-amd64
             os: ubuntu-22.04
             platform: linux
             arch: x64
-            tls: quictls
+            tls: openssl
 
           - name: macos-amd64
             os: macos-15
             platform: macos
             arch: x64
-            tls: quictls
+            tls: openssl
 
           - name: macos-arm64
             os: macos-15
             platform: macos
             arch: arm64
-            tls: quictls
+            tls: openssl
 
           - name: android-arm64
             os: ubuntu-22.04
             platform: android
             arch: arm64
-            tls: quictls
+            tls: openssl
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -92,7 +92,7 @@ jobs:
         run: |
           $submodules = @()
           if ("${{ matrix.platform }}" -eq "windows") { $submodules += "submodules/xdp-for-windows" }
-          if ("${{ matrix.tls }}" -ne "schannel")   { $submodules += "submodules/quictls" }
+          if ("${{ matrix.tls }}" -ne "schannel")   { $submodules += "submodules/openssl" }
           if ($submodules.Count -gt 0) {
             git -C src submodule update --init --depth 1 $submodules
           }
@@ -114,11 +114,11 @@ jobs:
         if: matrix.platform == 'android'
         run: sudo apt-get update -qq && sudo apt-get install -y -qq cmake build-essential
 
-      - name: Install NASM (Windows quictls)
+      - name: Install NASM (Windows openssl)
         if: runner.os == 'Windows' && matrix.tls != 'schannel'
         uses: ilammy/setup-nasm@72793074d3c8cdda771dba85f6deafe00623038b # v1.5.2
 
-      - name: Install Perl (Windows quictls — needed by OpenSSL build)
+      - name: Install Perl (Windows openssl — needed by OpenSSL build)
         if: runner.os == 'Windows' && matrix.tls != 'schannel'
         shell: pwsh
         run: choco install strawberryperl -y --no-progress --limit-output
@@ -155,9 +155,9 @@ jobs:
           fetch-depth: 0
           path: src
 
-      - name: Init required submodules (quictls)
+      - name: Init required submodules (openssl)
         shell: bash
-        run: git -C src submodule update --init --depth 1 submodules/quictls
+        run: git -C src submodule update --init --depth 1 submodules/openssl
 
       - name: Fix git ownership
         run: chown -R $(id -u):$(id -g) src/
@@ -166,7 +166,7 @@ jobs:
       - name: Build (cross-compile)
         shell: pwsh
         working-directory: src
-        run: scripts/build.ps1 -Config Release -Platform linux -Arch arm64 -Tls quictls -DisableTools -DisableTest -DisablePerf -OneBranch
+        run: scripts/build.ps1 -Config Release -Platform linux -Arch arm64 -Tls openssl -DisableTools -DisableTest -DisablePerf -OneBranch
 
       - name: Upload raw artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -204,7 +204,7 @@ jobs:
           path: src
 
       - name: Init required submodules
-        run: git -C src submodule update --init --depth 1 submodules/quictls
+        run: git -C src submodule update --init --depth 1 submodules/openssl
 
       - name: Install deps
         run: |
@@ -221,7 +221,7 @@ jobs:
       - name: Build
         shell: pwsh
         working-directory: src
-        run: scripts/build.ps1 -Config Release -Platform linux -Arch ${{ matrix.arch }} -Tls quictls -DisableTools -DisableTest -DisablePerf ${{ matrix.onebranch }}
+        run: scripts/build.ps1 -Config Release -Platform linux -Arch ${{ matrix.arch }} -Tls openssl -DisableTools -DisableTest -DisablePerf ${{ matrix.onebranch }}
 
       - name: Upload raw artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -364,26 +364,26 @@ jobs:
 
           # Openssl: all platforms (regular Linux)
           Write-Host "=== Packaging MsQuicBuilds.Native.Openssl ==="
-          New-MsQuicPkg -Tls quictls -Title "Openssl" -Platforms @(
-            @{rid="win-x64";        os="windows"; a="x64";   tls="quictls"},
-            @{rid="win-arm64";      os="windows"; a="arm64"; tls="quictls"},
-            @{rid="linux-x64";      os="linux";   a="x64";   tls="quictls"},
-            @{rid="linux-arm64";    os="linux";   a="arm64"; tls="quictls"},
-            @{rid="osx-x64";        os="macos";   a="x64";   tls="quictls"},
-            @{rid="osx-arm64";      os="macos";   a="arm64"; tls="quictls"},
-            @{rid="android-arm64";  os="android"; a="arm64"; tls="quictls"}
+          New-MsQuicPkg -Tls openssl -Title "Openssl" -Platforms @(
+            @{rid="win-x64";        os="windows"; a="x64";   tls="openssl"},
+            @{rid="win-arm64";      os="windows"; a="arm64"; tls="openssl"},
+            @{rid="linux-x64";      os="linux";   a="x64";   tls="openssl"},
+            @{rid="linux-arm64";    os="linux";   a="arm64"; tls="openssl"},
+            @{rid="osx-x64";        os="macos";   a="x64";   tls="openssl"},
+            @{rid="osx-arm64";      os="macos";   a="arm64"; tls="openssl"},
+            @{rid="android-arm64";  os="android"; a="arm64"; tls="openssl"}
           )
 
           # Openssl.SteamRT: same platforms as Openssl but Linux compiled with SteamRT SDK
           Write-Host "=== Packaging MsQuicBuilds.Native.Openssl.SteamRT ==="
-          New-MsQuicPkg -Tls quictls -Title "Openssl.SteamRT" -Platforms @(
-            @{rid="win-x64";        os="windows"; a="x64";   tls="quictls"},
-            @{rid="win-arm64";      os="windows"; a="arm64"; tls="quictls"},
-            @{rid="linux-x64";      os="linux";   a="x64";   tls="quictls"},
-            @{rid="linux-arm64";    os="linux";   a="arm64"; tls="quictls"},
-            @{rid="osx-x64";        os="macos";   a="x64";   tls="quictls"},
-            @{rid="osx-arm64";      os="macos";   a="arm64"; tls="quictls"},
-            @{rid="android-arm64";  os="android"; a="arm64"; tls="quictls"}
+          New-MsQuicPkg -Tls openssl -Title "Openssl.SteamRT" -Platforms @(
+            @{rid="win-x64";        os="windows"; a="x64";   tls="openssl"},
+            @{rid="win-arm64";      os="windows"; a="arm64"; tls="openssl"},
+            @{rid="linux-x64";      os="linux";   a="x64";   tls="openssl"},
+            @{rid="linux-arm64";    os="linux";   a="arm64"; tls="openssl"},
+            @{rid="osx-x64";        os="macos";   a="x64";   tls="openssl"},
+            @{rid="osx-arm64";      os="macos";   a="arm64"; tls="openssl"},
+            @{rid="android-arm64";  os="android"; a="arm64"; tls="openssl"}
           )
 
           Write-Host "=== All NuGet packages ==="
